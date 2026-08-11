@@ -27,4 +27,28 @@ class UserOut(BaseModel):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
+
+class OTPSendRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class OTPSendRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    password: str

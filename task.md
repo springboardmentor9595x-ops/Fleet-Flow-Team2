@@ -1,0 +1,8 @@
+- `[ ]` Install Leaflet library in React frontend
+- `[ ]` Modify database models & run migrations (Shipments, Trips, GPS)
+- `[ ]` Implement Backend Shipment CRUD & status update endpoints
+- `[ ]` Implement Dijkstra Route Option Solvers & ETAs (Fastest, Shortest, Traffic-Avoid, Fuel-Efficient)
+- `[ ]` Implement FastAPI WebSockets with Redis/Memory PubSub & geofencing events
+- `[ ]` Update Frontend MapTracker.jsx to render interactive Leaflet maps & route lines
+- `[ ]` Create Frontend ShipmentPanel.jsx with stepper logs, delayed alerts, and CRUD forms
+- `[ ]` Verification & scratch test updates
