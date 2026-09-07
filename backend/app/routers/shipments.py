@@ -101,6 +101,13 @@ def edit_shipment(
     if not db_shipment:
         raise HTTPException(status_code=404, detail="Shipment record not found")
 
+    # Delivered shipments are strictly locked
+    if db_shipment.status == "Delivered":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Delivered shipments are locked and cannot be edited. They can only be viewed or deleted by authorized roles."
+        )
+
     return update_shipment(db=db, db_shipment=db_shipment, shipment=payload)
 
 @router.put("/{shipment_id}/status", response_model=ShipmentOut)
@@ -119,6 +126,20 @@ def update_delivery_status(
     if new_status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status value. Must be in: {valid_statuses}")
 
+    # 1. Delivered shipments are strictly locked
+    if db_shipment.status == "Delivered" and new_status != "Delivered":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Delivered shipments are locked and cannot be changed back to in-transit or other statuses."
+        )
+
+    # 2. In Transit forward-only progression check
+    if db_shipment.status == "In Transit" and new_status in ["Created", "Assigned"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="In-transit shipments cannot be reverted backwards to Created or Assigned."
+        )
+
     # Scoped permissions: Drivers can only transition status for shipments assigned to them!
     if current_user.role.value.upper() == "DRIVER":
         # Check if shipment is assigned to driver
@@ -134,7 +155,42 @@ def update_delivery_status(
     db.add(db_shipment)
     db.commit()
     db.refresh(db_shipment)
+
+    # Trigger notifications across the app for key lifecycle transitions
+    try:
+        from app.routers.notifications import create_and_broadcast_notification
+        trk = db_shipment.tracking_number or "Manifest"
+        cargo = db_shipment.cargo_description or "General Freight"
+
+        if new_status == "Delivered":
+            create_and_broadcast_notification(
+                db=db,
+                title="🎉 SHIPMENT DELIVERED",
+                message=f"Shipment [{trk}] ({cargo}) successfully delivered to {db_shipment.destination_address or 'Destination'}.",
+                type="delivery",
+                target_role="Dispatcher"
+            )
+        elif new_status == "Delayed":
+            create_and_broadcast_notification(
+                db=db,
+                title="⚠️ SHIPMENT DELAYED",
+                message=f"Shipment [{trk}] ({cargo}) marked as DELAYED in transit.",
+                type="warning",
+                target_role="Dispatcher"
+            )
+        elif new_status == "Cancelled":
+            create_and_broadcast_notification(
+                db=db,
+                title="❌ SHIPMENT CANCELLED",
+                message=f"Shipment [{trk}] ({cargo}) was cancelled.",
+                type="error",
+                target_role="Dispatcher"
+            )
+    except Exception as e:
+        print(f"[Shipment Notification Trigger] Note: {e}")
+
     return db_shipment
+
 
 @router.get("/alerts", response_model=list[ShipmentOut])
 def read_shipment_alerts(
@@ -187,11 +243,11 @@ def remove_shipment(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    # Driver role check
-    if current_user.role.value.upper() == "DRIVER":
+    # Admin role check for deletion
+    if current_user.role.value.upper() != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Operation rejected. Driver clearance is insufficient."
+            detail="Only Admin can delete shipments."
         )
 
     db_shipment = get_shipment(db, shipment_id=shipment_id)

@@ -12,7 +12,7 @@ from app.models.trip import Trip
 from app.models.shipment import Shipment
 from app.models.gps_tracking import GPSTracking
 from app.utils.routing import solve_dijkstra_route, DEPOTS
-from app.routers.trips import notify_shipment_status_change
+from app.routers.trips import notify_shipment_status_change, notify_trip_cargo_status_change
 
 router = APIRouter()
 
@@ -52,10 +52,36 @@ manager = ConnectionManager()
 
 # In-memory tracking of simulation steps: { trip_id: current_step }
 SIMULATION_STEPS = {}
+MILESTONES_SENT = {}
 
-def downsample_coords(coords: list[dict], target_len: int = 15) -> list[dict]:
+def get_nearest_intermediate_city(lat: float, lng: float, start_loc: str, dest_loc: str) -> str:
+    from app.utils.routing import INDIAN_LOCATIONS, DEPOTS
+    import math
+    
+    start_upper = start_loc.upper()
+    dest_upper = dest_loc.upper()
+    
+    candidates = {}
+    for name, coords in INDIAN_LOCATIONS.items():
+        if name not in start_upper and name not in dest_upper:
+            candidates[name] = coords
+    for code, data in DEPOTS.items():
+        name = data.get("name", code).upper()
+        if code not in start_upper and code not in dest_upper:
+            candidates[name] = (data["lat"], data["lng"])
+            
+    best_city = "Intermediate Hub"
+    min_dist = float("inf")
+    for name, (clat, clng) in candidates.items():
+        d = math.hypot(lat - clat, lng - clng)
+        if d < min_dist:
+            min_dist = d
+            best_city = name
+    return best_city
+
+def downsample_coords(coords: list[dict], target_len: int = 75) -> list[dict]:
     """
-    Downsamples coordinates to a smaller size to make simulation pace pleasant.
+    Downsamples coordinates to a detailed path (~75 steps for ~3 minute real-time tracking).
     """
     if len(coords) <= target_len:
         return coords
@@ -81,6 +107,7 @@ async def run_telemetry_simulation():
         try:
             active_trips = db.query(Trip).filter(Trip.status == "In Transit").all()
             
+            payload_trips = []
             for trip in active_trips:
                 trip_uuid = str(trip.trip_id)
                 route_type = trip.route_type or "Fastest"
@@ -90,8 +117,8 @@ async def run_telemetry_simulation():
                 if not route_details["coords"]:
                     continue
 
-                detailed_coords = downsample_coords(route_details["coords"], target_len=15)
-                total_steps = len(detailed_coords)
+                full_coords = route_details["coords"]
+                total_steps = len(full_coords)
 
                 curr_step = SIMULATION_STEPS.get(trip_uuid, 0)
                 license_plate = trip.vehicle.license_plate if trip.vehicle else "FF-MOCK"
@@ -113,53 +140,23 @@ async def run_telemetry_simulation():
                         await manager.broadcast(event_payload)
                     
                     if trip.shipment:
-                        notify_shipment_status_change(trip.shipment, "Departed")
+                        notify_shipment_status_change(trip.shipment, "Departed", driver_name=driver_name, vehicle_plate=license_plate, stage="departed")
+                    else:
+                        notify_trip_cargo_status_change(trip, "Departed", driver_name=driver_name, vehicle_plate=license_plate, stage="departed")
 
-                # Retrieve next coordinates
+                # Retrieve next coordinates - smoothly step along real road coordinates (e.g. 4 points per ping)
                 is_arrived = False
                 if curr_step >= total_steps - 1:
                     is_arrived = True
-                    coord = detailed_coords[-1]
+                    coord = full_coords[-1]
                 else:
-                    next_step = curr_step + 1
+                    next_step = min(curr_step + 4, total_steps - 1)
                     SIMULATION_STEPS[trip_uuid] = next_step
-                    coord = detailed_coords[next_step]
-                    
-                    # Geofence check to destination coordinates
-                    dest_coord = detailed_coords[-1]
-                    if check_geofence_arrival(coord["lat"], coord["lng"], dest_coord["lat"], dest_coord["lng"]):
+                    coord = full_coords[next_step]
+                    if next_step >= total_steps - 1:
                         is_arrived = True
-                        coord = dest_coord
 
-                # Simulated Route Deviation / Rerouting Alert
-                if not is_arrived and curr_step > 2 and curr_step < total_steps - 3 and random.random() < 0.08:
-                    alt_types = [t for t in ["Fastest", "Shortest", "Traffic Avoidance", "Fuel Efficient"] if t != route_type]
-                    new_route_type = random.choice(alt_types)
-                    trip.route_type = new_route_type
-                    
-                    # Recalculate route from current position to end location
-                    current_pos_str = f"{coord['lat']},{coord['lng']}"
-                    new_route = await asyncio.to_thread(solve_dijkstra_route, current_pos_str, trip.destination, new_route_type)
-                    
-                    if new_route and new_route.get("coords"):
-                        detailed_coords = downsample_coords(new_route["coords"], target_len=12)
-                        total_steps = len(detailed_coords)
-                        curr_step = 0
-                        SIMULATION_STEPS[trip_uuid] = 0
-                        coord = detailed_coords[0]
-                        route_details = new_route
-                        route_type = new_route_type
-                        
-                        reroute_payload = {
-                            "type": "REROUTE_EVENT",
-                            "trip_id": trip_uuid,
-                            "license_plate": license_plate,
-                            "message": f"Route deviation detected for vehicle {license_plate}! Recalculating path to target using {new_route_type} route."
-                        }
-                        if redis_pubsub_available and r_pubsub:
-                            r_pubsub.publish("telemetry_channel", json.dumps(reroute_payload))
-                        else:
-                            await manager.broadcast(reroute_payload)
+# Random deviation removed so vehicle moves strictly on the path
 
                 # Save coordinate log record to gps_tracking
                 gps_log = GPSTracking(
@@ -174,6 +171,86 @@ async def run_telemetry_simulation():
                 # ETA calculations
                 remaining_fraction = 1.0 - (curr_step / max(1, total_steps - 1))
                 eta_remaining = int(route_details["duration"] * remaining_fraction) if not is_arrived else 0
+                dist_rem = 0.0 if is_arrived else round(route_details["distance"] * remaining_fraction, 1)
+                
+                eta_str = f"{eta_remaining // 60} min" if eta_remaining < 3600 else f"{eta_remaining // 3600}h {(eta_remaining % 3600) // 60}m"
+
+                # 2. En-Route Intermediate Checkpoint / Milestone Email Alert (~50% progress)
+                if 0.40 <= remaining_fraction <= 0.60 and not is_arrived and "checkpoint" not in MILESTONES_SENT.get(trip_uuid, set()):
+                    MILESTONES_SENT.setdefault(trip_uuid, set()).add("checkpoint")
+                    near_city = get_nearest_intermediate_city(coord["lat"], coord["lng"], trip.start_location, trip.destination)
+                    if trip.shipment:
+                        notify_shipment_status_change(
+                            trip.shipment,
+                            status="In Transit",
+                            driver_name=driver_name,
+                            vehicle_plate=license_plate,
+                            checkpoint_city=near_city,
+                            distance_remaining=dist_rem,
+                            eta_str=eta_str,
+                            stage="checkpoint"
+                        )
+                    else:
+                        notify_trip_cargo_status_change(
+                            trip,
+                            status="In Transit",
+                            driver_name=driver_name,
+                            vehicle_plate=license_plate,
+                            checkpoint_city=near_city,
+                            distance_remaining=dist_rem,
+                            eta_str=eta_str,
+                            stage="checkpoint"
+                        )
+                    m_payload = {
+                        "type": "MILESTONE_EVENT",
+                        "trip_id": trip_uuid,
+                        "license_plate": license_plate,
+                        "city": near_city,
+                        "distance_remaining": dist_rem,
+                        "eta_str": eta_str,
+                        "message": f"Vehicle {license_plate} is now near {near_city}! Approaching {trip.destination} in {eta_str} ({dist_rem} km remaining)."
+                    }
+                    if redis_pubsub_available and r_pubsub:
+                        r_pubsub.publish("telemetry_channel", json.dumps(m_payload))
+                    else:
+                        await manager.broadcast(m_payload)
+
+                # 3. 2km Geofence Proximity / Out for Delivery Alert
+                if (dist_rem <= 2.0 or curr_step >= total_steps - 3) and not is_arrived and "proximity_2km" not in MILESTONES_SENT.get(trip_uuid, set()):
+                    MILESTONES_SENT.setdefault(trip_uuid, set()).add("proximity_2km")
+                    if trip.shipment:
+                        notify_shipment_status_change(
+                            trip.shipment,
+                            status="In Transit",
+                            driver_name=driver_name,
+                            vehicle_plate=license_plate,
+                            distance_remaining=dist_rem,
+                            eta_str=eta_str,
+                            stage="proximity_2km"
+                        )
+                    else:
+                        notify_trip_cargo_status_change(
+                            trip,
+                            status="In Transit",
+                            driver_name=driver_name,
+                            vehicle_plate=license_plate,
+                            distance_remaining=dist_rem,
+                            eta_str=eta_str,
+                            stage="proximity_2km"
+                        )
+                    prox_payload = {
+                        "type": "PROXIMITY_EVENT",
+                        "trip_id": trip_uuid,
+                        "license_plate": license_plate,
+                        "destination": trip.destination,
+                        "distance_remaining": dist_rem,
+                        "eta_str": eta_str,
+                        "message": f"OUT FOR DELIVERY: Vehicle {license_plate} is within 2 km of {trip.destination}! Arriving in ~{eta_str}."
+                    }
+                    if redis_pubsub_available and r_pubsub:
+                        r_pubsub.publish("telemetry_channel", json.dumps(prox_payload))
+                    else:
+                        await manager.broadcast(prox_payload)
 
                 # Update database trip coordinates
                 update_trip_coords(db, db_trip=trip, lat=coord["lat"], lng=coord["lng"], eta_seconds=eta_remaining)
@@ -185,12 +262,16 @@ async def run_telemetry_simulation():
                     db.add(trip)
                     
                     # 2. Update linked Shipment to Delivered
+                    tracking_num = trip.cargo
                     if trip.shipment_id:
                         shipment = db.query(Shipment).filter(Shipment.shipment_id == trip.shipment_id).first()
                         if shipment:
                             shipment.status = "Delivered"
+                            tracking_num = shipment.tracking_number
                             db.add(shipment)
-                            notify_shipment_status_change(shipment, "Completed")
+                            notify_shipment_status_change(shipment, "Completed", driver_name=driver_name, vehicle_plate=license_plate, stage="completed")
+                    else:
+                        notify_trip_cargo_status_change(trip, "Completed", driver_name=driver_name, vehicle_plate=license_plate, stage="completed")
                     
                     if trip.vehicle:
                         trip.vehicle.status = "Available"  # Force vehicle status to Available
@@ -202,6 +283,44 @@ async def run_telemetry_simulation():
                         
                     SIMULATION_STEPS.pop(trip_uuid, None)
                     print(f"[Geofencing Alert] Vehicle arrived at destination depot. Trip {trip_uuid} completed.")
+
+                    # In-App Notification Dispatch for Stakeholders & Driver
+                    try:
+                        from app.routers.notifications import create_and_broadcast_notification
+                        
+                        # 1. Notify Fleet Managers & Admins
+                        create_and_broadcast_notification(
+                            db=db,
+                            title="🎉 SHIPMENT DELIVERED",
+                            message=f"Shipment #{tracking_num} (Vehicle {license_plate}) has arrived at destination {trip.destination} and is marked DELIVERED.",
+                            type="success",
+                            target_role="FleetManager",
+                            broadcast_ws=True
+                        )
+
+                        # 2. Notify Dispatchers
+                        create_and_broadcast_notification(
+                            db=db,
+                            title="🎉 SHIPMENT DELIVERED",
+                            message=f"Shipment #{tracking_num} (Vehicle {license_plate}) has arrived at destination {trip.destination} and is marked DELIVERED.",
+                            type="success",
+                            target_role="Dispatcher",
+                            broadcast_ws=True
+                        )
+
+                        # 3. Notify Driver
+                        if trip.driver and getattr(trip.driver, 'user', None):
+                            create_and_broadcast_notification(
+                                db=db,
+                                title="🎉 TRIP DELIVERED & COMPLETED",
+                                message=f"You have arrived at {trip.destination}. Shipment #{tracking_num} marked as DELIVERED.",
+                                type="success",
+                                user_id=trip.driver.user.user_id,
+                                target_role="Driver",
+                                broadcast_ws=True
+                            )
+                    except Exception as ne:
+                        print(f"[Delivery Notification Error] {ne}")
 
                     # Geofence Arrival (Enter) Alert
                     event_payload = {
@@ -219,24 +338,26 @@ async def run_telemetry_simulation():
 
                 db.commit()
 
-                # Telemetry update payload
+                payload_trips.append({
+                    "trip_id": trip_uuid,
+                    "license_plate": license_plate,
+                    "driver_name": driver_name,
+                    "driver_id": str(trip.driver_id) if trip.driver_id else None,
+                    "lat": coord["lat"],
+                    "lng": coord["lng"],
+                    "status": trip.status,
+                    "eta_seconds": eta_remaining,
+                    "cargo": trip.cargo,
+                    "route_type": route_type,
+                    "distance_remaining": 0.0 if is_arrived else round(route_details["distance"] * remaining_fraction, 1),
+                    "route_coords": [[c["lat"], c["lng"]] for c in route_details["coords"]]
+                })
+
+            if payload_trips:
                 payload = {
                     "type": "TELEMETRY_UPDATE",
-                    "active_trips": [{
-                        "trip_id": trip_uuid,
-                        "license_plate": license_plate,
-                        "driver_name": driver_name,
-                        "lat": coord["lat"],
-                        "lng": coord["lng"],
-                        "status": trip.status,
-                        "eta_seconds": eta_remaining,
-                        "cargo": trip.cargo,
-                        "route_type": route_type,
-                        "distance_remaining": round(route_details["distance"] * remaining_fraction, 1),
-                        "route_coords": [[c["lat"], c["lng"]] for c in detailed_coords]
-                    }]
+                    "active_trips": payload_trips
                 }
-
                 # Publish telemetry to Redis Pub/Sub or fall back to memory broadcast
                 if redis_pubsub_available and r_pubsub:
                     try:
@@ -251,8 +372,8 @@ async def run_telemetry_simulation():
         finally:
             db.close()
 
-        # Telemetry update interval runs every 3 seconds
-        await asyncio.sleep(3.0)
+        # Telemetry update interval runs every 2.5 seconds (~3 minute total trip duration)
+        await asyncio.sleep(2.5)
 
 async def redis_listener():
     """
@@ -285,22 +406,45 @@ async def websocket_endpoint(websocket: WebSocket):
     db: Session = SessionLocal()
     try:
         active_trips = db.query(Trip).filter(Trip.status == "In Transit").all()
+        if not active_trips:
+            latest = db.query(Trip).order_by(Trip.created_at.desc()).first()
+            if latest:
+                active_trips = [latest]
+
         initial_data = []
         for t in active_trips:
             route_details = await asyncio.to_thread(solve_dijkstra_route, t.start_location, t.destination, t.route_type or "Fastest")
-            detailed_coords = downsample_coords(route_details["coords"], target_len=15)
+            coords_list = route_details.get("coords", [])
+            
+            # Position truck at destination if Completed/Delivered, or origin if Scheduled
+            lat_val = t.current_lat
+            lng_val = t.current_lng
+            is_trip_finished = t.status in ["Completed", "Delivered"]
+            
+            if is_trip_finished and coords_list:
+                lat_val = coords_list[-1]["lat"]
+                lng_val = coords_list[-1]["lng"]
+            elif t.status == "Scheduled" and coords_list:
+                lat_val = coords_list[0]["lat"]
+                lng_val = coords_list[0]["lng"]
+            elif not lat_val or not lng_val:
+                if coords_list:
+                    lat_val = coords_list[0]["lat"]
+                    lng_val = coords_list[0]["lng"]
+
             initial_data.append({
                 "trip_id": str(t.trip_id),
                 "license_plate": t.vehicle.license_plate if t.vehicle else "FF-MOCK",
                 "driver_name": t.driver.user.full_name if (t.driver and t.driver.user) else "Operator",
-                "lat": t.current_lat,
-                "lng": t.current_lng,
+                "driver_id": str(t.driver_id) if t.driver_id else None,
+                "lat": lat_val,
+                "lng": lng_val,
                 "status": t.status,
-                "eta_seconds": t.eta_seconds,
+                "eta_seconds": 0 if is_trip_finished else t.eta_seconds,
                 "cargo": t.cargo,
                 "route_type": t.route_type,
-                "distance_remaining": t.distance,
-                "route_coords": [[c["lat"], c["lng"]] for c in detailed_coords]
+                "distance_remaining": 0.0 if is_trip_finished else t.distance,
+                "route_coords": [[c["lat"], c["lng"]] for c in coords_list]
             })
         await websocket.send_json({
             "type": "INITIAL_STATE",

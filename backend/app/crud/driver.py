@@ -70,10 +70,26 @@ def update_driver(db: Session, db_driver: Driver, driver_in: DriverUpdate):
 
 
 def delete_driver(db: Session, db_driver: Driver):
-    """Delete driver record and optionally the linked user."""
+    """Delete driver record and optionally the linked user, cleaning up FK references first."""
+    from app.models.vehicle import Vehicle
+    from app.models.shipment import Shipment
+    from app.models.trip import Trip
+
+    # 1. Nullify driver assignment in vehicles
+    db.query(Vehicle).filter(Vehicle.assigned_driver == db_driver.driver_id).update({Vehicle.assigned_driver: None})
+    
+    # 2. Nullify driver references in shipments
+    db.query(Shipment).filter(Shipment.driver_id == db_driver.driver_id).update({Shipment.driver_id: None})
+    
+    # 3. Nullify driver references in trips
+    db.query(Trip).filter(Trip.driver_id == db_driver.driver_id).update({Trip.driver_id: None})
+
+    db.commit()
+
     user_id = db_driver.user_id
     db.delete(db_driver)
     db.commit()
+
     # Also delete the linked user
     user = db.query(User).filter(User.user_id == user_id).first()
     if user:

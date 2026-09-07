@@ -10,11 +10,15 @@ class VehicleMaintenance(Base):
     
     maintenance_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     vehicle_id = Column(UUID(as_uuid=True), ForeignKey("vehicles.vehicle_id"), nullable=False)
-    description = Column(Text, nullable=False)
+    maintenance_type = Column(String(100), nullable=False, default="General Inspection")
+    service_date = Column(Date, nullable=True, default=datetime.utcnow)
+    next_service_date = Column(Date, nullable=True)
     cost = Column(Float, nullable=False, default=0.0)
-    start_date = Column(Date, nullable=False, default=datetime.utcnow)
-    end_date = Column(Date, nullable=True)
-    status = Column(String(20), default="Pending", nullable=False) # Pending/Completed
+    remarks = Column(Text, nullable=True)
+    status = Column(String(20), default="Scheduled", nullable=False)
+    last_alert_sent = Column(DateTime, nullable=True)
+    notification_stage = Column(String(50), nullable=True)  # 'SCHEDULED', '7_DAYS', '1_DAY', 'DUE_HOURLY'
+    last_due_alert = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationship

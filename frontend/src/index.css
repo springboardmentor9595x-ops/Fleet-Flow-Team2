@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-brand-indigo: #00f0ff;
   --color-brand-violet: #6366f1;
@@ -61,6 +63,13 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Light Theme Root & Body Overrides */
+html.light, body.light {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
 }
 
 #root {
@@ -71,6 +80,396 @@ html, body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Light Mode Global Component Styling Overrides - Sharp & Well-Defined Modern Theme */
+.light .glass-card {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border: 1.5px solid #cbd5e1 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 4px 6px -2px rgba(15, 23, 42, 0.04) !important;
+  color: #0f172a !important;
+}
+
+.light .glass-card:hover {
+  border-color: #0284c7 !important;
+  box-shadow: 0 16px 35px -5px rgba(2, 132, 199, 0.15), 0 0 15px 0 rgba(2, 132, 199, 0.1) !important;
+}
+
+.light .glass-card input,
+.light .glass-card select,
+.light .glass-card textarea,
+.light input:not([type="checkbox"]):not([type="radio"]),
+.light select,
+.light textarea {
+  background: #ffffff !important;
+  border: 1.5px solid #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: #64748b !important;
+}
+
+.light input:focus,
+.light select:focus,
+.light textarea:focus {
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2) !important;
+}
+
+/* Light Mode Sidebar & Header Panels with Sharp Separator Borders */
+.light aside {
+  background: #ffffff !important;
+  border-right: 1.5px solid #cbd5e1 !important;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.05) !important;
+}
+
+.light header:not(.auth-header):not([class*="bg-transparent"]) {
+  background: rgba(255, 255, 255, 0.98) !important;
+  border-bottom: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.auth-header,
+.light .auth-header {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.light header h1,
+.light header h2,
+.light header h3,
+.light h1,
+.light h2,
+.light h3 {
+  color: #0f172a !important;
+}
+
+.light header p {
+  color: #0284c7 !important;
+}
+
+/* Light mode panels & gradient card containers with distinct borders */
+.light [class*="bg-gradient-to-br from-slate-900"],
+.light [class*="bg-gradient-to-r from-slate-900"],
+.light [class*="bg-gradient-to-b from-slate-900"],
+.light [class*="bg-gradient-to-br from-slate-950"],
+.light [class*="bg-gradient-to-r from-slate-950"],
+.light [class*="bg-gradient-to-b from-slate-950"],
+.light [class*="from-[#0c0f24]"],
+.light [class*="from-[#060713]"],
+.light [class*="from-slate-900"],
+.light [class*="from-slate-950"],
+.light [class*="to-slate-950"],
+.light [class*="to-slate-900"],
+.light [class*="via-[#080b1e]"],
+.light [class*="via-[#0e1326]"],
+.light [class*="via-[#0a0e1f]"],
+.light [class*="bg-slate-900"],
+.light [class*="bg-slate-950"],
+.light [class*="bg-[#0a0e1f]"],
+.light [class*="bg-[#06070d]"],
+.light [class*="bg-[#060713]"],
+.light [class*="bg-[#0e1326]"],
+.light [class*="bg-[#0c0f24]"],
+.light [class*="bg-[#050614]"],
+.light [class*="bg-[#010207]"],
+.light [class*="bg-[#101322]"],
+.light [class*="bg-[#11121c]"],
+.light [class*="bg-[#13151f]"],
+.light [class*="bg-[#0f1422]"],
+.light [class*="bg-[#1b1e2c]"],
+.light [class*="bg-[#181b2a]"] {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04) !important;
+}
+
+.light [class*="border-white/10"],
+.light [class*="border-white/15"],
+.light [class*="border-white/5"],
+.light [class*="border-white/20"],
+.light [class*="border-white/30"],
+.light [class*="border-white/40"],
+.light [class*="border-white/"] {
+  border-color: #cbd5e1 !important;
+}
+
+.light [class*="border-b"]:not(nav *):not(header *):not(table *) {
+  border-bottom-color: #cbd5e1 !important;
+}
+
+.light [class*="border-t"]:not(nav *):not(header *):not(table *) {
+  border-top-color: #cbd5e1 !important;
+}
+
+.light [class*="bg-white/2"],
+.light [class*="bg-white/5"],
+.light [class*="bg-white/10"] {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light [class*="bg-slate-950/"] {
+  background-color: #f8fafc !important;
+}
+
+/* Light mode text contrast overrides */
+.light [class*="text-white"]:not(.badge-stay-white):not([class*="bg-cyan-500"]):not([class*="bg-blue-600"]):not([class*="bg-emerald-500"]) {
+  color: #0f172a !important;
+}
+
+.light [class*="text-white/30"],
+.light [class*="text-white/40"],
+.light [class*="text-white/45"],
+.light [class*="text-white/50"],
+.light [class*="text-white/60"],
+.light [class*="text-white/70"],
+.light [class*="text-white/80"],
+.light [class*="text-slate-400"],
+.light [class*="text-slate-300"],
+.light [class*="text-slate-200"] {
+  color: #334155 !important;
+}
+
+.light [class*="text-cyan-400"],
+.light [class*="text-cyan-300"],
+.light [class*="text-[#00f0ff]"] {
+  color: #0284c7 !important;
+}
+
+.light [class*="text-emerald-400"],
+.light [class*="text-emerald-300"] {
+  color: #047857 !important;
+}
+
+.light [class*="text-amber-400"],
+.light [class*="text-amber-300"] {
+  color: #b45309 !important;
+}
+
+.light [class*="text-rose-400"],
+.light [class*="text-rose-300"] {
+  color: #be123c !important;
+}
+
+.light [class*="text-purple-400"],
+.light [class*="text-purple-300"] {
+  color: #6b21a8 !important;
+}
+
+.light [class*="text-blue-400"],
+.light [class*="text-blue-300"] {
+  color: #1d4ed8 !important;
+}
+
+/* Light mode colored scorecards & metric boxes */
+.light [class*="bg-emerald-950"],
+.light [class*="bg-amber-950"],
+.light [class*="bg-rose-950"],
+.light [class*="bg-cyan-950"] {
+  background-color: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Light mode action buttons */
+.light button[class*="bg-slate-800"] {
+  background-color: #ffffff !important;
+  border: 1.5px solid #cbd5e1 !important;
+}
+.light button[class*="bg-slate-800"]:hover {
+  background-color: #f8fafc !important;
+}
+.light button[class*="bg-slate-800"][class*="text-emerald-"] {
+  border-color: #6ee7b7 !important;
+  color: #047857 !important;
+}
+.light button[class*="bg-slate-800"][class*="text-amber-"] {
+  border-color: #fcd34d !important;
+  color: #b45309 !important;
+}
+.light button[class*="bg-slate-800"][class*="text-rose-"] {
+  border-color: #fda4af !important;
+  color: #be123c !important;
+}
+
+/* Reports Top Export Buttons & Select Dropdown */
+.light button[class*="border-rose-400"] {
+  background-color: #ffe4e6 !important;
+  border: 2px solid #e11d48 !important;
+  color: #9f1239 !important;
+  box-shadow: 0 1px 3px rgba(225, 29, 72, 0.2) !important;
+}
+
+.light button[class*="border-rose-400"]:hover {
+  background-color: #fecdd3 !important;
+  border-color: #be123c !important;
+  color: #881337 !important;
+}
+
+.light button[class*="border-emerald-400"] {
+  background-color: #dcfce7 !important;
+  border: 2px solid #059669 !important;
+  color: #065f46 !important;
+  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.2) !important;
+}
+
+.light button[class*="border-emerald-400"]:hover {
+  background-color: #bbf7d0 !important;
+  border-color: #047857 !important;
+  color: #064e3b !important;
+}
+
+.light select#report-select {
+  background-color: #ffffff !important;
+  border: 2px solid #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.light select#report-select:focus {
+  border-color: #0284c7 !important;
+}
+
+/* Light mode table headers and rows */
+.light table {
+  border: 1.5px solid #cbd5e1 !important;
+}
+
+.light table thead tr {
+  background-color: #f1f5f9 !important;
+  border-bottom: 2px solid #94a3b8 !important;
+  color: #0f172a !important;
+}
+
+.light table thead th {
+  color: #0f172a !important;
+  background-color: #f1f5f9 !important;
+  border-bottom: 2px solid #94a3b8 !important;
+  font-weight: 800 !important;
+}
+
+.light table tbody tr {
+  background-color: #ffffff !important;
+  border-bottom: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+.light table tbody tr:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light table tbody td {
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.light table tbody td span:not([class*="bg-"]) {
+  color: #0f172a !important;
+}
+
+/* Light mode badges and pills (Targeted specifically to badge wrappers) */
+.light span[class*="bg-slate-800"],
+.light span[class*="rounded-full"][class*="bg-cyan-"],
+.light span[class*="rounded-md"][class*="bg-cyan-"],
+.light span[class*="rounded-lg"][class*="bg-cyan-"],
+.light span[class*="rounded-xl"][class*="bg-cyan-"],
+.light div[class*="rounded-full"][class*="bg-cyan-"],
+.light div[class*="rounded-xl"][class*="bg-cyan-500/10"] {
+  background-color: #e0f2fe !important;
+  border-color: #bae6fd !important;
+  color: #0369a1 !important;
+}
+
+.light span[class*="rounded-full"][class*="bg-emerald-"],
+.light span[class*="rounded-md"][class*="bg-emerald-"],
+.light span[class*="rounded-lg"][class*="bg-emerald-"] {
+  background-color: #dcfce7 !important;
+  border: 1.5px solid #059669 !important;
+  color: #064e3b !important;
+  font-weight: 800 !important;
+}
+
+.light span[class*="rounded-full"][class*="bg-amber-"],
+.light span[class*="rounded-md"][class*="bg-amber-"],
+.light span[class*="rounded-lg"][class*="bg-amber-"] {
+  background-color: #fef3c7 !important;
+  border: 1.5px solid #d97706 !important;
+  color: #78350f !important;
+  font-weight: 800 !important;
+}
+
+.light span[class*="rounded-full"][class*="bg-rose-"],
+.light span[class*="rounded-md"][class*="bg-rose-"],
+.light span[class*="rounded-lg"][class*="bg-rose-"] {
+  background-color: #ffe4e6 !important;
+  border: 1.5px solid #e11d48 !important;
+  color: #881337 !important;
+  font-weight: 800 !important;
+}
+
+.light span[class*="rounded-full"][class*="bg-purple-"],
+.light span[class*="rounded-md"][class*="bg-purple-"],
+.light span[class*="rounded-lg"][class*="bg-purple-"] {
+  background-color: #f3e8ff !important;
+  border: 1.5px solid #9333ea !important;
+  color: #581c87 !important;
+  font-weight: 800 !important;
+}
+
+/* Light mode navigation active indicator */
+.light nav button[class*="from-cyan-500/20"],
+.light nav button[class*="bg-cyan-50"] {
+  background: linear-gradient(to right, rgba(2, 132, 199, 0.12), rgba(2, 132, 199, 0.04), transparent) !important;
+  border-color: rgba(2, 132, 199, 0.3) !important;
+  color: #0284c7 !important;
+}
+
+.light nav button:not([class*="from-cyan-500/20"]):not([class*="bg-cyan-50"]) {
+  color: #64748b !important;
+}
+
+.light nav button:not([class*="from-cyan-500/20"]):not([class*="bg-cyan-50"]):hover {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+/* Light mode modals overlay */
+.light [class*="fixed"][class*="z-"][class*="bg-slate-950/"] {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* Light mode particle canvas opacity softening */
+.light canvas {
+  opacity: 0.15 !important;
+}
+
+.light .cyber-blob-1,
+.light .cyber-blob-2 {
+  opacity: 0.1 !important;
+}
+
+.light .cyber-grid {
+  background-image: 
+    linear-gradient(rgba(2, 132, 199, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(2, 132, 199, 0.03) 1px, transparent 1px) !important;
+}
+
+.light .sidebar-scroll {
+  scrollbar-color: rgba(2, 132, 199, 0.2) transparent;
+}
+.light .sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(2, 132, 199, 0.2);
+}
+.light .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(2, 132, 199, 0.4);
 }
 
 /* Floating Neon Blurs (Blobs) */
@@ -213,23 +612,62 @@ html, body {
   transform: translateY(-1px) !important;
 }
 
-/* Custom Scrollbar */
+/* ========================================================================= */
+/* Modern Sleek Scrollbars (Dark & Light Mode)                                */
+/* ========================================================================= */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.35) transparent;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(6, 7, 13, 0.95);
+  background: transparent;
+  border-radius: 9999px;
+  margin: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.25);
-  border-radius: 3px;
+  background: rgba(0, 240, 255, 0.35);
+  border-radius: 9999px;
+  border: 1px solid rgba(0, 240, 255, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 240, 255, 0.55);
+  background: rgba(0, 240, 255, 0.7);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+/* Light mode sleek scrollbar */
+.light * {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f1f5f9;
+}
+
+.light ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 9999px;
+  margin: 3px;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 1px solid #94a3b8;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #0284c7;
+  border-color: #0284c7;
 }
 
 /* Animations */
@@ -336,7 +774,16 @@ aside nav button.bg-white\/10 {
   position: relative;
   align-items: center;
   justify-content: flex-end;
-  overflow-x: hidden;
+  overflow: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.truckWrapper::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
 }
 
 .truckBody {
@@ -367,50 +814,109 @@ aside nav button.bg-white\/10 {
   width: 24px;
 }
 
+/* Truck Loader Road & Highway Transmission Towers */
 .road {
   width: 100%;
-  height: 1.5px;
-  background-color: rgba(255, 255, 255, 0.25);
+  height: 2.5px;
+  background-color: #38bdf8;
   position: relative;
   bottom: 0;
   align-self: flex-end;
-  border-radius: 3px;
+  border-radius: 9999px;
+  box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
 }
 
 .road::before {
   content: "";
   position: absolute;
-  width: 20px;
+  width: 30px;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: #00f0ff;
   right: -50%;
-  border-radius: 3px;
-  animation: roadAnimation 1.4s linear infinite;
-  border-left: 10px solid rgba(255, 255, 255, 0.5);
+  border-radius: 9999px;
+  animation: roadAnimation 1.2s linear infinite;
+  box-shadow: 0 0 6px rgba(0, 240, 255, 0.8);
 }
 
 .road::after {
   content: "";
   position: absolute;
-  width: 10px;
+  width: 18px;
   height: 100%;
-  background-color: rgba(255, 255, 255, 0.2);
-  right: -65%;
-  border-radius: 3px;
-  animation: roadAnimation 1.4s linear infinite;
-  border-left: 4px solid rgba(255, 255, 255, 0.5);
+  background-color: #38bdf8;
+  right: -75%;
+  border-radius: 9999px;
+  animation: roadAnimation 1.2s linear infinite;
 }
 
 .lampPost {
   position: absolute;
   bottom: 0;
+  height: 85px;
+  width: 22px;
+  color: rgba(0, 240, 255, 0.5);
+  animation: roadAnimation 1.8s linear infinite;
+  z-index: 1;
+}
+
+.lampPost1 {
+  right: -40%;
+}
+
+.lampPost2 {
   right: -90%;
-  height: 90px;
-  fill: rgba(255, 255, 255, 0.85);
-  animation: roadAnimation 1.4s linear infinite;
+  animation-delay: 0.9s;
+}
+
+/* Light mode loader road & towers */
+.light .road {
+  background-color: #334155 !important;
+  box-shadow: none !important;
+}
+
+.light .road::before {
+  background-color: #0284c7 !important;
+  box-shadow: none !important;
+}
+
+.light .road::after {
+  background-color: #0284c7 !important;
+}
+
+.light .lampPost {
+  color: #475569 !important;
 }
 
 @keyframes roadAnimation {
   0% { transform: translateX(0px); }
   100% { transform: translateX(-350px); }
+}
+
+/* Toast bottom loader progress animation */
+@keyframes toastLoaderProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Sidebar subtle custom scrollbar */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 240, 255, 0.2) transparent;
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.2);
+  border-radius: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.5);
 }

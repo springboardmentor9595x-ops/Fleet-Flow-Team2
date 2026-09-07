@@ -13,7 +13,7 @@ class Driver(Base):
     license_number = Column(String(50), unique=True, nullable=True)
     experience_years = Column(Integer, nullable=True)
     address = Column(String, nullable=True)
-    status = Column(String(20), default="Active", nullable=False) # Active/Inactive
+    status = Column(String(20), default="Available", nullable=False) # Available/Inactive/Assigned/In Transit
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", backref="driver_profile")

@@ -41,6 +41,9 @@ class MaintenanceOut(BaseModel):
     cost: Optional[float] = None
     remarks: Optional[str] = None
     status: str
+    last_alert_sent: Optional[datetime] = None
+    notification_stage: Optional[str] = None
+    last_due_alert: Optional[datetime] = None
     created_at: Optional[datetime] = None
 
     class Config:

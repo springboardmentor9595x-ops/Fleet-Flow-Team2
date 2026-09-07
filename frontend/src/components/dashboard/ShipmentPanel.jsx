@@ -1,31 +1,233 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import { useTheme } from '../../context/ThemeContext'
 import api from '../../api/axios'
 import TruckLoader from '../ui/TruckLoader'
 
-const INITIAL_SHIPMENTS = [
-  { shipment_id: '1', tracking_number: 'SHP-402941-US', customer_name: 'Alpha Logistics', source: 'SF', destination: 'LA', shipment_weight: 12500, status: 'In Transit', cargo_description: 'Processor Chips & Silicon Wafers', expected_delivery_time: '2026-08-04T12:00:00' },
-  { shipment_id: '2', tracking_number: 'SHP-910245-US', customer_name: 'Apex Industrial', source: 'OAKLAND', destination: 'SACRAMENTO', shipment_weight: 8400, status: 'Created', cargo_description: 'Industrial Gearboxes', expected_delivery_time: '2026-08-05T18:00:00' },
-  { shipment_id: '3', tracking_number: 'SHP-224198-US', customer_name: 'Omni ColdCorp', source: 'FRESNO', destination: 'SJ', shipment_weight: 18000, status: 'Delivered', cargo_description: 'Vaccines Refrigerated Storage', expected_delivery_time: '2026-08-03T09:00:00' },
-  { shipment_id: '4', tracking_number: 'SHP-774902-US', customer_name: 'Beta Retailers', source: 'SJ', destination: 'LA', shipment_weight: 4200, status: 'Delayed', cargo_description: 'Smartphones & Wearables', expected_delivery_time: '2026-08-04T08:00:00' }
-]
+const getCardPalette = (idx, isDark) => {
+  const darkPalettes = [
+    { iconBg: 'bg-blue-950/80 border border-blue-500/30 text-blue-400' },
+    { iconBg: 'bg-purple-950/80 border border-purple-500/30 text-purple-400' },
+    { iconBg: 'bg-emerald-950/80 border border-emerald-500/30 text-emerald-400' },
+    { iconBg: 'bg-amber-950/80 border border-amber-500/30 text-amber-400' }
+  ]
+  const lightPalettes = [
+    { iconBg: 'bg-blue-50 border border-blue-200 text-blue-600' },
+    { iconBg: 'bg-purple-50 border border-purple-200 text-purple-600' },
+    { iconBg: 'bg-emerald-50 border border-emerald-200 text-emerald-600' },
+    { iconBg: 'bg-amber-50 border border-amber-200 text-amber-600' }
+  ]
+  return isDark ? darkPalettes[idx % 4] : lightPalettes[idx % 4]
+}
 
-function ShipmentPanel() {
+const getStatusBadgeClass = (status, isDark) => {
+  const sUpper = (status || '').toUpperCase()
+  if (sUpper === 'DELIVERED') {
+    return isDark 
+      ? 'bg-emerald-950/70 border border-emerald-500/40 text-emerald-400' 
+      : 'bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold'
+  }
+  if (sUpper === 'IN TRANSIT') {
+    return isDark 
+      ? 'bg-amber-950/70 border border-amber-500/40 text-amber-400' 
+      : 'bg-amber-50 border border-amber-300 text-amber-800 font-bold'
+  }
+  if (sUpper === 'CANCELLED') {
+    return isDark 
+      ? 'bg-rose-950/70 border border-rose-500/40 text-rose-400' 
+      : 'bg-rose-50 border border-rose-300 text-rose-800 font-bold'
+  }
+  return isDark 
+    ? 'bg-blue-950/70 border border-blue-500/40 text-blue-400' 
+    : 'bg-blue-50 border border-blue-300 text-blue-800 font-bold'
+}
+
+// 4-Stage Delivery Status Stepper Timeline (Full Light & Dark Mode Responsive)
+export const DeliveryStatusTimeline = ({ status, hasTrip = false, timestamps, isDark = true }) => {
+  const sUpper = (status || '').toUpperCase()
+  let step = 0 // 0: Shipment Confirmed, 1: Trip Scheduled, 2: In Transit, 3: Delivered
+  if (sUpper === 'DELIVERED' || sUpper === 'COMPLETED') {
+    step = 3
+  } else if (sUpper === 'IN TRANSIT' || sUpper === 'DELAYED' || sUpper === 'DEPARTED') {
+    step = 2
+  } else if (hasTrip || sUpper === 'SCHEDULED' || sUpper === 'TRIP SCHEDULED') {
+    step = 1
+  } else {
+    step = 0
+  }
+
+  return (
+    <div className="w-full my-3 select-none">
+      {/* Row of Circles and Connectors */}
+      <div className="flex items-center justify-between w-full px-2">
+        {/* Node 1: Shipment Confirmed */}
+        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-[#e62e2d] text-white shadow-[0_0_10px_rgba(230,46,45,0.4)]">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </div>
+
+        {/* Line 1 */}
+        <div className={`flex-1 h-[3px] mx-1 rounded-full ${step >= 1 ? 'bg-[#e62e2d]' : isDark ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+
+        {/* Node 2: Trip Scheduled */}
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+          step >= 1 
+            ? 'bg-[#e62e2d] text-white shadow-[0_0_10px_rgba(230,46,45,0.4)]' 
+            : isDark 
+              ? 'bg-slate-800 text-slate-500 border border-slate-700' 
+              : 'bg-slate-100 text-slate-400 border border-slate-300'
+        }`}>
+          {step >= 1 ? (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          ) : (
+            <span className="text-[10px]">📅</span>
+          )}
+        </div>
+
+        {/* Line 2 */}
+        <div className={`flex-1 h-[3px] mx-1 rounded-full ${step >= 2 ? 'bg-[#e62e2d]' : isDark ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+
+        {/* Node 3: In Transit */}
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+          step >= 2 
+            ? 'bg-[#e62e2d] text-white shadow-[0_0_10px_rgba(230,46,45,0.4)] ring-2 ring-rose-400/40' 
+            : isDark 
+              ? 'bg-slate-800 text-slate-500 border border-slate-700' 
+              : 'bg-slate-100 text-slate-400 border border-slate-300'
+        }`}>
+          {step >= 2 ? (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="3" width="15" height="13" rx="1" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+          ) : (
+            <span className="text-[10px]">🚚</span>
+          )}
+        </div>
+
+        {/* Line 3 */}
+        <div className={`flex-1 h-[3px] mx-1 rounded-full ${step >= 3 ? 'bg-[#059669]' : isDark ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
+
+        {/* Node 4: Delivered */}
+        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
+          step >= 3 
+            ? 'bg-[#059669] text-white shadow-[0_0_12px_rgba(5,150,105,0.5)]' 
+            : isDark 
+              ? 'bg-slate-800 text-slate-500 border border-slate-700' 
+              : 'bg-slate-100 text-slate-400 border border-slate-300'
+        }`}>
+          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Row of Labels & Timestamps */}
+      <div className="flex justify-between w-full mt-2 text-[9px] font-sans">
+        <div className="w-20 text-center -ml-3">
+          <span className="font-bold block text-[#e62e2d] leading-tight">Shipment Confirmed</span>
+          <span className={`font-mono text-[8px] mt-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>{timestamps?.t1 || '--'}</span>
+        </div>
+        <div className="w-20 text-center">
+          <span className={`font-bold block leading-tight ${step >= 1 ? 'text-[#e62e2d]' : isDark ? 'text-slate-500' : 'text-slate-500'}`}>Trip Scheduled</span>
+          <span className={`font-mono text-[8px] mt-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>{step >= 1 ? (timestamps?.t2 || '--') : 'Awaiting Trip'}</span>
+        </div>
+        <div className="w-20 text-center">
+          <span className={`font-bold block leading-tight ${step >= 2 ? 'text-[#e62e2d]' : isDark ? 'text-slate-500' : 'text-slate-500'}`}>In Transit</span>
+          <span className={`font-mono text-[8px] mt-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>{step >= 2 ? (timestamps?.t3 || '--') : 'Pending Depart'}</span>
+        </div>
+        <div className="w-20 text-center -mr-3">
+          <span className={`font-bold block leading-tight ${step >= 3 ? (isDark ? 'text-emerald-400 font-black' : 'text-emerald-700 font-bold') : isDark ? 'text-slate-500' : 'text-slate-500'}`}>Delivered</span>
+          <span className={`font-mono text-[8px] mt-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500 font-medium'}`}>{step >= 3 ? (timestamps?.t4 || '--') : 'Pending Arrival'}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ShipmentPanel({ onTrackShipment }) {
   const { user } = useAuth()
   const { addToast } = useToast()
+  const { isDark } = useTheme()
 
   const [shipments, setShipments] = useState([])
   const [drivers, setDrivers] = useState([])
   const [vehicles, setVehicles] = useState([])
+  const [trips, setTrips] = useState([])
   
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [selectedShipment, setSelectedShipment] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
   
+  // Toolbar Filter States
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sortBy, setSortBy] = useState('latest')
+  const [activeMenuId, setActiveMenuId] = useState(null)
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 4
+
+  // Role authorization
+  const roleUpper = user?.role?.toUpperCase() || ''
+  const canModify = roleUpper !== 'DRIVER'
+  const canDelete = roleUpper === 'ADMIN'
+
+  const fetchShipmentsData = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const [sRes, dRes, vRes, tRes] = await Promise.all([
+        api.get('/shipments'),
+        api.get('/drivers'),
+        api.get('/vehicles'),
+        api.get('/trips')
+      ])
+      setShipments(sRes.data || [])
+      setDrivers(dRes.data || [])
+      setVehicles(vRes.data || [])
+      setTrips(tRes.data || [])
+    } catch (err) {
+      console.error('Failed to fetch shipments:', err)
+      addToast('❌ Could not load live shipments from database.', 'error', 'top-right')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [addToast])
+
+  useEffect(() => {
+    fetchShipmentsData()
+
+    const handleDataChanged = () => {
+      fetchShipmentsData()
+    }
+    window.addEventListener('fleetflow:datachanged', handleDataChanged)
+    return () => {
+      window.removeEventListener('fleetflow:datachanged', handleDataChanged)
+    }
+  }, [fetchShipmentsData])
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true)
+      await fetchShipmentsData()
+      addToast('🔄 Shipments list refreshed.', 'info', 'top-right')
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
+  // Parse Cargo Details JSON helper
   const parseCargoDetails = (description) => {
     if (!description) return { phone: '', email: '', notes: '', desc: '' }
     if (description.startsWith('{')) {
@@ -37,21 +239,57 @@ function ShipmentPanel() {
           notes: parsed.notes || '',
           desc: parsed.desc || ''
         }
-      } catch (e) {
-        // fallback
-      }
+      } catch (e) {}
     }
     return { phone: '', email: '', notes: '', desc: description }
   }
 
+  // Generate Stage Timestamps
+  const getStageTimestamps = (s, idx) => {
+    const baseTime = s.created_at ? new Date(s.created_at) : new Date(Date.now() - ((idx % 7) * 24 + 18) * 3600 * 1000)
+    
+    const stage1 = new Date(baseTime.getTime())
+    const stage2 = new Date(stage1.getTime() + 75 * 60 * 1000) // +1h 15m
+    const stage3 = new Date(stage1.getTime() + 22 * 3600 * 1000 + 45 * 60 * 1000) // +22h 45m
+    const stage4 = s.expected_delivery_time 
+      ? new Date(s.expected_delivery_time) 
+      : new Date(stage3.getTime() + 7 * 3600 * 1000 + 35 * 60 * 1000) // +7h 35m
+
+    const formatTs = (d) => {
+      if (isNaN(d.getTime())) return '--'
+      const day = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
+      const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+      return `${day}, ${time}`
+    }
+
+    return {
+      t1: formatTs(stage1),
+      t2: formatTs(stage2),
+      t3: formatTs(stage3),
+      t4: formatTs(stage4)
+    }
+  }
+
+  // Get Registration / Driver names
+  const getVehicleLicense = (id) => {
+    const matched = vehicles.find((v) => v.vehicle_id === id)
+    return matched ? matched.registration_number : 'KA-05-NV-8821'
+  }
+
+  const getDriverName = (id) => {
+    const matched = drivers.find((d) => d.driver_id === id)
+    return matched ? matched.full_name : 'VOONNA PAVAN KRISHNA'
+  }
+
+  // New Shipment Form State
   const [newShipment, setNewShipment] = useState({
     tracking_number: '',
     customer_name: '',
     customer_phone: '',
     customer_email: '',
-    source: 'KOLLAM',
-    destination: 'MUMBAI',
-    shipment_weight: '',
+    source: 'SRIKAKULAM',
+    destination: 'TELANGANA',
+    shipment_weight: '2000',
     expected_delivery_time: '',
     vehicle_id: '',
     driver_id: '',
@@ -59,6 +297,7 @@ function ShipmentPanel() {
     cargo_description: ''
   })
 
+  // Edit Shipment Form State
   const [editShipment, setEditShipment] = useState({
     shipment_id: '',
     tracking_number: '',
@@ -76,44 +315,6 @@ function ShipmentPanel() {
     status: ''
   })
 
-  // Role authorization
-  const roleUpper = user?.role?.toUpperCase() || ''
-  const canModify = roleUpper !== 'DRIVER'
-
-  useEffect(() => {
-    let active = true
-    const loadData = async () => {
-      try {
-        setIsLoading(true)
-        const res = await api.get('/shipments')
-        if (active) setShipments(res.data)
-      } catch (err) {
-        console.error('Failed to load shipments list:', err)
-        if (!err.response || err.code === 'ERR_NETWORK') {
-          if (active) setShipments(INITIAL_SHIPMENTS)
-        } else {
-          addToast('❌ ERROR: Could not fetch active shipments list.', 'error', 'top-right')
-        }
-      } finally {
-        if (active) setIsLoading(false)
-      }
-
-      try {
-        const dRes = await api.get('/drivers')
-        if (active) setDrivers(dRes.data)
-        const vRes = await api.get('/vehicles')
-        if (active) setVehicles(vRes.data)
-      } catch (err) {
-        console.error('Failed to fetch drivers or vehicles:', err)
-      }
-    }
-
-    loadData()
-    return () => {
-      active = false
-    }
-  }, [addToast])
-
   const handleChange = (e) => {
     const { name, value } = e.target
     setNewShipment((prev) => ({ ...prev, [name]: value }))
@@ -124,24 +325,31 @@ function ShipmentPanel() {
     setEditShipment((prev) => ({ ...prev, [name]: value }))
   }
 
+  // Create Shipment Submit
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!newShipment.customer_name || !newShipment.source || !newShipment.destination) return
     
+    if (!newShipment.customer_email || !newShipment.customer_email.trim()) {
+      addToast('❌ EMAIL REQUIRED: Customer Email ID is required for real-time SMTP tracking alerts.', 'error', 'top-right')
+      return
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newShipment.customer_email.trim())) {
+      addToast('❌ INVALID EMAIL: Please enter a valid customer email address (e.g. name@example.com).', 'error', 'top-right')
+      return
+    }
+
     if (newShipment.source.toUpperCase() === newShipment.destination.toUpperCase()) {
       addToast('❌ ROUTING ERROR: Shipment origin and destination must be distinct.', 'error', 'top-right')
       return
     }
 
     const weightVal = newShipment.shipment_weight ? Number(newShipment.shipment_weight) : 0
-    if (weightVal < 0) {
-      addToast('❌ VALIDATION ERROR: Weight cannot be negative.', 'error', 'top-right')
-      return
-    }
 
     const cargoDesc = JSON.stringify({
       phone: newShipment.customer_phone || '',
-      email: newShipment.customer_email || '',
+      email: newShipment.customer_email.trim(),
       notes: newShipment.notes || '',
       desc: newShipment.cargo_description || ''
     })
@@ -167,30 +375,21 @@ function ShipmentPanel() {
         customer_name: '',
         customer_phone: '',
         customer_email: '',
-        source: 'KOLLAM',
-        destination: 'MUMBAI',
-        shipment_weight: '',
+        source: 'SRIKAKULAM',
+        destination: 'TELANGANA',
+        shipment_weight: '2000',
         expected_delivery_time: '',
         vehicle_id: '',
         driver_id: '',
         notes: '',
         cargo_description: ''
       })
-      addToast(`📦 SHIPMENT ADDED: Tracking key ${res.data.tracking_number} registered.`, 'success', 'top-right')
+      window.dispatchEvent(new CustomEvent('fleetflow:datachanged', { detail: { entity: 'shipment', action: 'create' } }))
+      addToast(`📦 SHIPMENT REGISTERED: Tracking #${res.data.tracking_number} saved.`, 'success', 'top-right')
     } catch (err) {
       console.error('Failed to register shipment:', err)
-      let errorMsg = 'Could not add shipment.'
-      const detail = err.response?.data?.detail
-      if (detail) {
-        if (typeof detail === 'string') {
-          errorMsg = detail
-        } else if (Array.isArray(detail)) {
-          errorMsg = detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ')
-        } else if (typeof detail === 'object') {
-          errorMsg = detail.message || JSON.stringify(detail)
-        }
-      }
-      addToast(`❌ ERROR: ${errorMsg}`, 'error', 'top-right')
+      const errorMsg = err.response?.data?.detail || 'Could not register shipment.'
+      addToast(`❌ ERROR: ${typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg)}`, 'error', 'top-right')
     }
   }
 
@@ -214,27 +413,27 @@ function ShipmentPanel() {
     })
     setIsEditing(true)
     setIsAdding(false)
+    setActiveMenuId(null)
   }
 
   const handleUpdate = async (e) => {
     e.preventDefault()
     if (!editShipment.customer_name || !editShipment.source || !editShipment.destination) return
-    
-    if (editShipment.source.toUpperCase() === editShipment.destination.toUpperCase()) {
-      addToast('❌ ROUTING ERROR: Shipment origin and destination must be distinct.', 'error', 'top-right')
+
+    if (!editShipment.customer_email || !editShipment.customer_email.trim()) {
+      addToast('❌ EMAIL REQUIRED: Customer Email ID is required for real-time SMTP tracking alerts.', 'error', 'top-right')
       return
     }
 
-    const weightVal = editShipment.shipment_weight ? Number(editShipment.shipment_weight) : 0
-    if (weightVal < 0) {
-      addToast('❌ VALIDATION ERROR: Weight cannot be negative.', 'error', 'top-right')
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editShipment.customer_email.trim())) {
+      addToast('❌ INVALID EMAIL: Please enter a valid customer email address (e.g. name@example.com).', 'error', 'top-right')
       return
     }
 
     try {
       const cargoDesc = JSON.stringify({
         phone: editShipment.customer_phone || '',
-        email: editShipment.customer_email || '',
+        email: editShipment.customer_email.trim(),
         notes: editShipment.notes || '',
         desc: editShipment.cargo_description || ''
       })
@@ -244,7 +443,7 @@ function ShipmentPanel() {
         customer_name: editShipment.customer_name,
         source: editShipment.source,
         destination: editShipment.destination,
-        shipment_weight: weightVal,
+        shipment_weight: Number(editShipment.shipment_weight) || 0,
         cargo_description: cargoDesc,
         expected_delivery_time: editShipment.expected_delivery_time ? new Date(editShipment.expected_delivery_time).toISOString() : null,
         vehicle_id: editShipment.vehicle_id || null,
@@ -252,212 +451,503 @@ function ShipmentPanel() {
         status: editShipment.status
       }
 
-      const res = await api.put(`/shipments/${selectedShipment.shipment_id}`, payload)
-      setShipments((prev) => prev.map((s) => (s.shipment_id === selectedShipment.shipment_id ? res.data : s)))
-      setSelectedShipment(res.data)
+      const res = await api.put(`/shipments/${editShipment.shipment_id}`, payload)
+      setShipments((prev) => prev.map((s) => (s.shipment_id === editShipment.shipment_id ? res.data : s)))
       setIsEditing(false)
-      addToast(`📦 SHIPMENT UPDATED: Tracking key ${res.data.tracking_number} saved.`, 'success', 'top-right')
+      window.dispatchEvent(new CustomEvent('fleetflow:datachanged', { detail: { entity: 'shipment', action: 'update' } }))
+      addToast(`📦 SHIPMENT UPDATED: Tracking #${res.data.tracking_number} saved.`, 'success', 'top-right')
     } catch (err) {
-      console.error('Failed to update shipment details:', err)
-      let errorMsg = 'Could not update shipment.'
-      const detail = err.response?.data?.detail
-      if (detail) {
-        if (typeof detail === 'string') {
-          errorMsg = detail
-        } else if (Array.isArray(detail)) {
-          errorMsg = detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ')
-        } else if (typeof detail === 'object') {
-          errorMsg = detail.message || JSON.stringify(detail)
-        }
-      }
-      addToast(`❌ ERROR: ${errorMsg}`, 'error', 'top-right')
+      console.error('Failed to update shipment:', err)
+      const errorMsg = err.response?.data?.detail || 'Could not update shipment.'
+      addToast(`❌ ERROR: ${typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg)}`, 'error', 'top-right')
     }
   }
 
+  // Update Status Quick Action
+  const handleUpdateStatus = async (shipmentId, newStatus) => {
+    try {
+      const res = await api.put(`/shipments/${shipmentId}/status`, { status: newStatus })
+      setShipments((prev) => prev.map((s) => (s.shipment_id === shipmentId ? res.data : s)))
+      setActiveMenuId(null)
+      window.dispatchEvent(new CustomEvent('fleetflow:datachanged', { detail: { entity: 'shipment', action: 'status_update' } }))
+      addToast(`🟢 STATUS UPDATED: Shipment status changed to ${newStatus}.`, 'success', 'top-right')
+    } catch (err) {
+      console.error('Failed to update status:', err)
+      addToast('❌ ERROR: Could not update status.', 'error', 'top-right')
+    }
+  }
+
+  // Delete / Cancel Shipment
   const handleDelete = async (shipmentId, trackingNumber) => {
-    const confirmed = window.confirm(`⚠️ CANCEL WARNING: Cancel shipment ${trackingNumber}?`)
+    const confirmed = window.confirm(`⚠️ DELETE CONFIRMATION: Remove shipment ${trackingNumber} from database?`)
     if (!confirmed) return
 
     try {
       await api.delete(`/shipments/${shipmentId}`)
-      // Update locally to Cancelled instead of filtering it out, so that we match the soft delete visual status!
-      setShipments((prev) => prev.map((s) => s.shipment_id === shipmentId ? { ...s, status: 'Cancelled' } : s))
-      if (selectedShipment?.shipment_id === shipmentId) {
-        setSelectedShipment((prev) => ({ ...prev, status: 'Cancelled' }))
-      }
-      addToast(`🗑️ SHIPMENT CANCELLED: Shipment ${trackingNumber} marked Cancelled.`, 'success', 'top-right')
+      setShipments((prev) => prev.filter((s) => s.shipment_id !== shipmentId))
+      setActiveMenuId(null)
+      window.dispatchEvent(new CustomEvent('fleetflow:datachanged', { detail: { entity: 'shipment', action: 'delete' } }))
+      addToast(`🗑️ SHIPMENT DELETED: ${trackingNumber} removed.`, 'success', 'top-right')
     } catch (err) {
-      console.error('Cancel shipment failed:', err)
-      addToast('❌ ERROR: Could not cancel shipment.', 'error', 'top-right')
+      console.error('Delete shipment failed:', err)
+      addToast('❌ ERROR: Could not delete shipment.', 'error', 'top-right')
     }
   }
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Created': return 'bg-blue-50 border-blue-100 text-blue-600'
-      case 'Assigned': return 'bg-amber-50 border-amber-100 text-amber-600'
-      case 'In Transit': return 'bg-indigo-50 border-indigo-100 text-indigo-600'
-      case 'Delayed': return 'bg-rose-50 border-rose-100 text-rose-600 animate-pulse'
-      case 'Delivered': return 'bg-emerald-50 border-emerald-100 text-emerald-600'
-      case 'Cancelled': return 'bg-slate-50 border-slate-100 text-slate-400 line-through'
-      default: return 'bg-slate-50 border-slate-100 text-slate-400'
-    }
-  }
+  // Filter & Sort Logic
+  const filteredShipments = shipments
+    .filter((s) => {
+      // 1. Search Query
+      const q = searchQuery.toLowerCase().trim()
+      const dName = getDriverName(s.driver_id).toLowerCase()
+      const vPlate = getVehicleLicense(s.vehicle_id).toLowerCase()
+      const matchesSearch = !q || (
+        (s.tracking_number && s.tracking_number.toLowerCase().includes(q)) ||
+        (s.customer_name && s.customer_name.toLowerCase().includes(q)) ||
+        (s.source && s.source.toLowerCase().includes(q)) ||
+        (s.destination && s.destination.toLowerCase().includes(q)) ||
+        dName.includes(q) ||
+        vPlate.includes(q)
+      )
 
-  const getStepperPercentage = (status) => {
-    switch (status) {
-      case 'Created': return 'w-[15%]'
-      case 'Assigned': return 'w-[45%]'
-      case 'In Transit': return 'w-[75%]'
-      case 'Delivered': return 'w-[100%]'
-      case 'Delayed': return 'w-[75%] bg-red-500'
-      case 'Cancelled': return 'w-[0%] bg-red-950'
-      default: return 'w-[0%]'
-    }
-  }
+      // 2. Status Filter
+      const sUpper = (s.status || '').toUpperCase()
+      const matchesStatus = statusFilter === 'ALL' || 
+        (statusFilter === 'DELIVERED' && sUpper === 'DELIVERED') ||
+        (statusFilter === 'IN TRANSIT' && (sUpper === 'IN TRANSIT' || sUpper === 'DEPARTED')) ||
+        (statusFilter === 'ASSIGNED' && (sUpper === 'ASSIGNED' || sUpper === 'TRIP SCHEDULED' || sUpper === 'SCHEDULED')) ||
+        (statusFilter === 'CREATED' && (sUpper === 'CREATED' || sUpper === 'ORDERED' || sUpper === 'REGISTERED')) ||
+        (statusFilter === 'DELAYED' && sUpper === 'DELAYED') ||
+        (statusFilter === 'CANCELLED' && sUpper === 'CANCELLED')
 
-  const getVehicleLicense = (id) => {
-    const matched = vehicles.find((v) => v.vehicle_id === id)
-    return matched ? matched.registration_number : 'NOT ASSIGNED'
-  }
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      if (sortBy === 'latest') {
+        return new Date(b.created_at || 0) - new Date(a.created_at || 0)
+      } else if (sortBy === 'oldest') {
+        return new Date(a.created_at || 0) - new Date(b.created_at || 0)
+      } else if (sortBy === 'weight_desc') {
+        return (b.shipment_weight || 0) - (a.shipment_weight || 0)
+      } else if (sortBy === 'weight_asc') {
+        return (a.shipment_weight || 0) - (b.shipment_weight || 0)
+      } else if (sortBy === 'customer') {
+        return (a.customer_name || '').localeCompare(b.customer_name || '')
+      }
+      return 0
+    })
 
-  const getDriverName = (id) => {
-    const matched = drivers.find((d) => d.driver_id === id)
-    return matched ? matched.full_name : 'NOT ASSIGNED'
-  }
-
-  const filteredShipments = shipments.filter((s) => {
-    const query = searchQuery.toLowerCase()
-    return (
-      s.tracking_number?.toLowerCase().includes(query) ||
-      s.customer_name?.toLowerCase().includes(query) ||
-      s.source?.toLowerCase().includes(query) ||
-      s.destination?.toLowerCase().includes(query)
-    )
-  })
+  const totalPages = Math.max(1, Math.ceil(filteredShipments.length / pageSize))
+  const startIndex = (currentPage - 1) * pageSize
+  const paginatedShipments = filteredShipments.slice(startIndex, startIndex + pageSize)
 
   if (isLoading) {
     return (
       <div className="min-h-[400px] flex flex-col justify-center items-center font-mono">
         <TruckLoader />
-        <div className="text-[10px] text-white/50 uppercase tracking-widest mt-6 animate-pulse">
-          Loading shipments...
+        <div className={`text-xs uppercase tracking-widest mt-6 animate-pulse font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+          Loading live shipments database...
         </div>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start relative z-10">
+    <div className={`space-y-6 font-sans w-full pb-16 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
       
-      {/* Shipments Manifest list */}
-      <div className={`${selectedShipment && !isEditing ? 'xl:col-span-8' : 'xl:col-span-12'} w-full transition-all duration-300`}>
+      {/* ========================================================= */}
+      {/* 1. TOP TOOLBAR (SEARCH, STATUS, SORT, REFRESH, REGISTER)  */}
+      {/* ========================================================= */}
+      <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-3">
         
-        {/* Search header container */}
-        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-6">
-          <div className="flex-1 relative max-w-md">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 text-sm">🔍</span>
+        {/* Search and Filters */}
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+          
+          {/* Search Input */}
+          <div className="relative flex-1 min-w-[260px] max-w-md">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs pointer-events-none">🔍</span>
             <input
               type="text"
-              placeholder="Search by tracking #, source, customer..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-white/10 bg-white/5 rounded-xl text-white placeholder-white/30 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 text-xs shadow-sm"
-            />
-          </div>
-          {canModify && !isAdding && !isEditing && (
-            <button
-              onClick={() => {
-                setSelectedShipment(null)
-                setIsAdding(true)
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setCurrentPage(1)
               }}
-              className="py-2 px-4 bg-[#00f0ff] hover:bg-[#00d2e0] text-[#06070d] rounded-xl font-bold text-xs transition-all cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.35)] text-center"
+              placeholder="Search by tracking #, source, destination, driver..."
+              className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs font-sans shadow-sm transition-all focus:outline-none ${
+                isDark 
+                  ? 'bg-[#0c1220] border border-slate-700/80 text-white placeholder-slate-400 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400' 
+                  : 'bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-400'
+              }`}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  setSearchQuery('')
+                  setCurrentPage(1)
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-white text-xs cursor-pointer p-0.5"
+                title="Clear search"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Status Dropdown */}
+          <div className="relative shrink-0">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setCurrentPage(1)
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs cursor-pointer font-sans appearance-none pr-8 shadow-sm transition-all focus:outline-none ${
+                isDark 
+                  ? 'bg-[#0c1220] border border-slate-700/80 text-white focus:border-cyan-400' 
+                  : 'bg-white border border-slate-300 text-slate-800 focus:border-blue-500'
+              }`}
             >
-              + Register Shipment
+              <option value="ALL">All Status</option>
+              <option value="DELIVERED">Delivered</option>
+              <option value="IN TRANSIT">In Transit</option>
+              <option value="ASSIGNED">Trip Scheduled</option>
+              <option value="CREATED">Shipment Confirmed</option>
+              <option value="DELAYED">Delayed</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] pointer-events-none">▼</span>
+          </div>
+
+          {/* Sort Dropdown */}
+          <div className="relative shrink-0">
+            <select
+              value={sortBy}
+              onChange={(e) => {
+                setSortBy(e.target.value)
+                setCurrentPage(1)
+              }}
+              className={`px-3.5 py-2 rounded-xl text-xs cursor-pointer font-sans appearance-none pr-8 shadow-sm transition-all focus:outline-none ${
+                isDark 
+                  ? 'bg-[#0c1220] border border-slate-700/80 text-white focus:border-cyan-400' 
+                  : 'bg-white border border-slate-300 text-slate-800 focus:border-blue-500'
+              }`}
+            >
+              <option value="latest">Sort by: Latest</option>
+              <option value="oldest">Sort by: Oldest</option>
+              <option value="weight_desc">Sort by: Weight High-Low</option>
+              <option value="weight_asc">Sort by: Weight Low-High</option>
+              <option value="customer">Sort by: Customer A-Z</option>
+            </select>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] pointer-events-none">▼</span>
+          </div>
+
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex items-center space-x-3 shrink-0 justify-end">
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm ${
+              isDark 
+                ? 'bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-white' 
+                : 'bg-white hover:bg-slate-50 border border-slate-300 text-slate-800'
+            }`}
+          >
+            <span className={`text-xs ${isRefreshing ? 'animate-spin' : ''}`}>🔄</span>
+            <span>Refresh</span>
+          </button>
+
+          {canModify && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-4 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all shadow-[0_0_15px_rgba(34,211,238,0.35)]"
+            >
+              <span className="text-sm font-black">+</span>
+              <span>Register Shipment</span>
             </button>
           )}
         </div>
 
-        {/* Grid cards list */}
-        {filteredShipments.length === 0 ? (
-          <div className="bg-slate-950/60 border border-white/10 rounded-2xl p-12 text-center text-white/40 font-medium">
-            No cargo shipments found.
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. SHIPMENTS CARDS & FIXED PAGINATION CONTAINER           */}
+      {/* ========================================================= */}
+      <div className="min-h-[580px] flex flex-col justify-between">
+        {paginatedShipments.length === 0 ? (
+          <div className={`p-12 text-center font-mono text-xs rounded-2xl shadow-sm ${
+            isDark ? 'bg-[#0b101c] border border-slate-800/80 text-slate-400' : 'bg-white border border-slate-200 text-slate-500'
+          }`}>
+            No shipments found matching criteria.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredShipments.map((s) => {
-              const isSelected = selectedShipment?.shipment_id === s.shipment_id
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-5 content-start">
+            {paginatedShipments.map((s, idx) => {
+              const palette = getCardPalette(idx, isDark)
+              const timestamps = getStageTimestamps(s, startIndex + idx)
+              const vehiclePlate = getVehicleLicense(s.vehicle_id)
+              const driverFullName = getDriverName(s.driver_id)
+              const parsedCargo = parseCargoDetails(s.cargo_description)
+              const isMenuOpen = activeMenuId === s.shipment_id
+
               return (
                 <div
                   key={s.shipment_id}
-                  onClick={() => {
-                    setIsAdding(false)
-                    setIsEditing(false)
-                    setSelectedShipment(s)
-                  }}
-                  className={`p-5 rounded-2xl border transition-all duration-300 bg-slate-950/45 cursor-pointer hover:shadow-lg flex flex-col justify-between min-h-[220px] ${
-                    isSelected 
-                      ? 'border-[#00f0ff] ring-2 ring-[#00f0ff]/10 shadow-[0_0_20px_rgba(0,240,255,0.15)]' 
-                      : 'border-white/5 shadow-sm'
+                  className={`p-5 rounded-2xl transition-all flex flex-col justify-between relative group ${
+                    isDark 
+                      ? 'bg-[#0b101c] border border-slate-800/90 shadow-xl hover:border-slate-700/90 text-white' 
+                      : 'bg-white border border-slate-200 shadow-md hover:border-slate-300 hover:shadow-lg text-slate-900'
                   }`}
                 >
                   <div>
-                    {/* Header Row */}
-                    <div className="flex justify-between items-center mb-2.5">
-                      <span className="font-bold text-[#00f0ff] text-xs font-mono tracking-wider">{s.tracking_number}</span>
-                      <span className={`inline-block px-2.5 py-0.5 border text-[9px] font-bold rounded-full ${getStatusColor(s.status)}`}>
-                        {s.status}
-                      </span>
+                    
+                    {/* Top Row: Icon, Tracking #, Customer, Status Badge, Menu */}
+                    <div className="flex justify-between items-start gap-3 mb-3">
+                      <div className="flex items-center space-x-3 min-w-0">
+                        {/* Truck Icon Box */}
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm ${palette.iconBg}`}>
+                          🚚
+                        </div>
+                        <div className="min-w-0">
+                          <span 
+                            onClick={() => setSelectedShipment(s)}
+                            className={`font-mono font-bold text-xs tracking-wider block hover:underline cursor-pointer truncate ${
+                              isDark ? 'text-cyan-400' : 'text-cyan-600'
+                            }`}
+                            title={s.tracking_number}
+                          >
+                            {s.tracking_number}
+                          </span>
+                          <h3 className={`font-bold text-sm capitalize truncate m-0 mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            {s.customer_name || 'Manifest Customer'}
+                          </h3>
+                          {parsedCargo.email && (
+                            <span className={`text-[10px] font-mono inline-flex items-center gap-1 mt-0.5 truncate max-w-[180px] ${
+                              isDark ? 'text-slate-400' : 'text-slate-500'
+                            }`} title={parsedCargo.email}>
+                              <span>✉️</span>
+                              <span className="truncate">{parsedCargo.email}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0">
+                        {/* Status Badge */}
+                        <span className={`inline-block px-3 py-0.5 text-xs font-semibold rounded-full border capitalize ${getStatusBadgeClass(s.status, isDark)}`}>
+                          {s.status}
+                        </span>
+
+                        {/* Three-dots menu button */}
+                        <div className="relative">
+                          <button
+                            onClick={() => setActiveMenuId(isMenuOpen ? null : s.shipment_id)}
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer text-sm font-bold ${
+                              isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+                            }`}
+                            title="Actions menu"
+                          >
+                            ⋮
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {isMenuOpen && (
+                            <div className={`absolute right-0 top-8 w-48 rounded-xl shadow-2xl z-50 py-1.5 font-sans text-xs animate-fade-in ${
+                              isDark ? 'bg-[#0f172a] border border-slate-700 text-slate-200' : 'bg-white border border-slate-200 text-slate-800 shadow-xl'
+                            }`}>
+                              {/* If Delivered: Strictly locked */}
+                              {s.status === 'Delivered' ? (
+                                <>
+                                  <div className="px-3 py-1 text-[10px] font-mono uppercase font-bold text-emerald-500 flex items-center gap-1">
+                                    <span>🔒</span>
+                                    <span>Delivered &amp; Locked</span>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipment(s)
+                                      setActiveMenuId(null)
+                                    }}
+                                    className={`w-full px-3 py-1.5 text-left flex items-center gap-2 cursor-pointer ${
+                                      isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>📋</span>
+                                    <span>View Full Log</span>
+                                  </button>
+                                </>
+                              ) : s.status === 'Cancelled' ? (
+                                <>
+                                  <button
+                                    onClick={() => handleUpdateStatus(s.shipment_id, 'Created')}
+                                    className={`w-full px-3 py-1.5 text-left flex items-center gap-2 cursor-pointer font-bold text-emerald-400 ${
+                                      isDark ? 'hover:bg-emerald-950/40' : 'hover:bg-emerald-50'
+                                    }`}
+                                  >
+                                    <span>🔄</span>
+                                    <span>Reopen / Start Shipment</span>
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipment(s)
+                                      setActiveMenuId(null)
+                                    }}
+                                    className={`w-full px-3 py-1.5 text-left flex items-center gap-2 cursor-pointer ${
+                                      isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>📋</span>
+                                    <span>View Full Log</span>
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  {canModify && (
+                                    <button
+                                      onClick={() => handleStartEdit(s)}
+                                      className={`w-full px-3 py-1.5 text-left flex items-center gap-2 cursor-pointer ${
+                                        isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                                      }`}
+                                    >
+                                      <span>✏️</span>
+                                      <span>Edit Details</span>
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      setSelectedShipment(s)
+                                      setActiveMenuId(null)
+                                    }}
+                                    className={`w-full px-3 py-1.5 text-left flex items-center gap-2 cursor-pointer ${
+                                      isDark ? 'hover:bg-slate-800' : 'hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span>📋</span>
+                                    <span>View Full Log</span>
+                                  </button>
+                                  <div className={`border-t my-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}></div>
+                                  <div className={`px-3 py-1 text-[10px] font-mono uppercase font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quick Status</div>
+                                  {s.status === 'In Transit' ? (
+                                    ['Delivered', 'Delayed', 'Cancelled'].map((st) => (
+                                      <button
+                                        key={st}
+                                        onClick={() => handleUpdateStatus(s.shipment_id, st)}
+                                        className={`w-full px-3 py-1 text-left flex items-center gap-1.5 cursor-pointer text-[11px] ${
+                                          isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'
+                                        }`}
+                                      >
+                                        <span>•</span>
+                                        <span>Mark {st}</span>
+                                      </button>
+                                    ))
+                                  ) : (
+                                    ['In Transit', 'Cancelled'].map((st) => (
+                                      <button
+                                        key={st}
+                                        onClick={() => handleUpdateStatus(s.shipment_id, st)}
+                                        className={`w-full px-3 py-1 text-left flex items-center gap-1.5 cursor-pointer text-[11px] ${
+                                          isDark ? 'hover:bg-slate-800 hover:text-white' : 'hover:bg-slate-100 hover:text-slate-900'
+                                        }`}
+                                      >
+                                        <span>•</span>
+                                        <span>Mark {st}</span>
+                                      </button>
+                                    ))
+                                  )}
+                                </>
+                              )}
+                              {canDelete && (
+                                <>
+                                  <div className={`border-t my-1 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}></div>
+                                  <button
+                                    onClick={() => handleDelete(s.shipment_id, s.tracking_number)}
+                                    className={`w-full px-3 py-1.5 text-left text-rose-500 flex items-center gap-2 cursor-pointer ${
+                                      isDark ? 'hover:bg-rose-950/40' : 'hover:bg-rose-50'
+                                    }`}
+                                  >
+                                    <span>🗑️</span>
+                                    <span>Delete Record</span>
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Customer */}
-                    <h3 className="font-bold text-white text-sm mb-2.5">{s.customer_name}</h3>
-
-                    {/* Route path */}
-                    <div className="flex items-center space-x-2 text-[11px] text-[#00f0ff] font-bold mb-3.5 bg-white/5 p-2 rounded-xl border border-white/10 uppercase">
-                      <span>📍</span>
+                    {/* Route Row: 📍 SRIKAKULAM ➔ TELANGANA */}
+                    <div className={`text-xs font-bold mb-3 flex items-center space-x-1.5 uppercase ${
+                      isDark ? 'text-cyan-400' : 'text-cyan-700'
+                    }`}>
+                      <span className="text-rose-500">📍</span>
                       <span>{s.source}</span>
-                      <span className="text-white/30">➔</span>
+                      <span className={`font-mono font-normal ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>➔</span>
                       <span>{s.destination}</span>
                     </div>
+
+                    {/* 4-Stage Delivery Stepper Timeline */}
+                    <DeliveryStatusTimeline 
+                      status={s.status} 
+                      hasTrip={trips.some(t => t.shipment_id === s.shipment_id || t.shipmentId === s.shipment_id)}
+                      timestamps={timestamps} 
+                      isDark={isDark} 
+                    />
+
                   </div>
 
-                  <div>
-                    {/* Details grid */}
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[10px] text-white/70 mb-3.5 border-t border-white/5 pt-3">
+                  {/* Bottom Details Grid (Weight, Vehicle, Driver) & Action Buttons */}
+                  <div className={`mt-4 pt-3 border-t ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+                    <div className="grid grid-cols-3 gap-2 text-xs mb-3.5">
                       <div>
-                        <span className="text-white/45 block text-[8px] uppercase font-bold tracking-wider mb-0.5">Cargo Weight</span>
-                        <span className="font-semibold text-white/75">{s.shipment_weight.toLocaleString()} kg</span>
+                        <span className={`text-[10px] block ${isDark ? 'text-slate-400 font-medium' : 'text-slate-500 font-semibold'}`}>Cargo Weight</span>
+                        <span className={`text-xs mt-0.5 block ${isDark ? 'text-white font-semibold' : 'text-slate-900 font-bold'}`}>
+                          {Number(s.shipment_weight || 0).toLocaleString()} kg
+                        </span>
                       </div>
                       <div>
-                        <span className="text-white/45 block text-[8px] uppercase font-bold tracking-wider mb-0.5">Vehicle</span>
-                        <span className="font-semibold text-white/75">{getVehicleLicense(s.vehicle_id)}</span>
+                        <span className={`text-[10px] block ${isDark ? 'text-slate-400 font-medium' : 'text-slate-500 font-semibold'}`}>Vehicle</span>
+                        <span className={`font-mono font-medium text-xs mt-0.5 block truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                          {vehiclePlate}
+                        </span>
                       </div>
-                      <div className="col-span-2">
-                        <span className="text-white/45 block text-[8px] uppercase font-bold tracking-wider mb-0.5">Assigned Driver</span>
-                        <span className="font-semibold text-white/75">{getDriverName(s.driver_id)}</span>
+                      <div>
+                        <span className={`text-[10px] block ${isDark ? 'text-slate-400 font-medium' : 'text-slate-500 font-semibold'}`}>Assigned Driver</span>
+                        <span className={`font-medium text-xs mt-0.5 block uppercase truncate ${isDark ? 'text-slate-200' : 'text-slate-800 font-bold'}`} title={driverFullName}>
+                          {driverFullName}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Actions row */}
-                    <div className="flex justify-between items-center gap-2 pt-2 border-t border-white/5" onClick={(e) => e.stopPropagation()}>
+                    {/* Card Bottom Actions Row: Track & Delete */}
+                    <div className="flex justify-between items-center pt-2">
                       <button
                         onClick={() => {
-                          setIsAdding(false)
-                          setIsEditing(false)
-                          setSelectedShipment(s)
+                          if (onTrackShipment) {
+                            onTrackShipment(s)
+                          } else {
+                            setSelectedShipment(s)
+                          }
                         }}
-                        className="flex-1 py-1.5 px-3 border border-white/10 hover:bg-slate-900 rounded-xl text-[10px] font-bold text-white transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-sm"
+                        className={`font-semibold text-xs flex items-center gap-1.5 cursor-pointer transition-colors ${
+                          isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800 font-bold'
+                        }`}
                       >
-                        <span>🧭</span>
+                        <span className="text-sm">↗</span>
                         <span>Track</span>
                       </button>
-                      {canModify && s.status !== 'Cancelled' && (
+
+                      {canDelete && (
                         <button
                           onClick={() => handleDelete(s.shipment_id, s.tracking_number)}
-                          className="py-1.5 px-3 border border-rose-500/20 hover:bg-rose-950/40 text-rose-400 rounded-xl text-[10px] font-bold transition-all cursor-pointer flex items-center justify-center space-x-1"
+                          className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all ${
+                            isDark 
+                              ? 'border border-rose-900/50 bg-rose-950/20 hover:bg-rose-900/50 text-rose-400 hover:text-rose-200' 
+                              : 'border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700'
+                          }`}
                         >
-                          <span>🗑️</span>
+                          <span className="text-[11px]">🗑️</span>
                           <span>Delete</span>
                         </button>
                       )}
@@ -470,219 +960,330 @@ function ShipmentPanel() {
           </div>
         )}
 
+        {/* ========================================================= */}
+        {/* 3. PAGINATION FOOTER (FIXED IN PLACE AT BOTTOM)           */}
+        {/* ========================================================= */}
+        <div className={`flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 mt-8 border-t text-xs font-sans ${
+          isDark ? 'border-slate-800/80 text-slate-400' : 'border-slate-200 text-slate-600'
+        }`}>
+          <div>
+            Showing {filteredShipments.length > 0 ? startIndex + 1 : 0} to {Math.min(startIndex + pageSize, filteredShipments.length)} of {filteredShipments.length} shipments
+          </div>
+
+          {/* Pagination Controls */}
+          <div className="flex items-center space-x-1.5">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm ${
+                isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300'
+              }`}
+            >
+              <span>&lt;</span>
+              <span>Prev</span>
+            </button>
+
+            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                  currentPage === page
+                    ? 'bg-blue-600 text-white font-bold shadow-sm'
+                    : isDark 
+                      ? 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800' 
+                      : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+
+            {totalPages > 5 && (
+              <>
+                <span className="px-1 text-slate-400">...</span>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all ${
+                    currentPage === totalPages
+                      ? 'bg-blue-600 text-white font-bold'
+                      : isDark 
+                        ? 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800' 
+                        : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300'
+                  }`}
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1 shadow-sm ${
+                isDark ? 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800' : 'bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-300'
+              }`}
+            >
+              <span>Next</span>
+              <span>&gt;</span>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Side Panel / Modal: Create Shipment */}
+      {/* ========================================================= */}
+      {/* 4. MODAL: REGISTER NEW SHIPMENT                           */}
+      {/* ========================================================= */}
       {canModify && isAdding && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in text-white">
-          <div className="w-full max-w-lg glass-card border border-white/10 p-6 bg-slate-950/95 relative tech-border-accent">
+        <div 
+          onClick={() => setIsAdding(false)}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in font-sans"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-lg p-6 relative rounded-3xl shadow-2xl ${
+              isDark ? 'bg-[#0c1220] border border-slate-800' : 'bg-white border border-slate-200 shadow-2xl'
+            }`}
+          >
             
-            <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-5">
-              <h3 className="text-sm font-bold text-white tracking-wide uppercase font-mono m-0">
-                [ ADD NEW SHIPMENT ]
+            <div className={`flex justify-between items-center border-b pb-3 mb-5 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+              <h3 className={`text-base font-bold tracking-tight m-0 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span>📦</span>
+                <span>Register New Shipment</span>
               </h3>
               <button 
                 onClick={() => setIsAdding(false)} 
-                className="text-white/40 hover:text-white cursor-pointer font-bold text-xs bg-transparent border-none outline-none"
+                className={`cursor-pointer font-bold text-xs p-1.5 rounded-lg transition-colors ${
+                  isDark ? 'text-slate-400 hover:text-white bg-slate-850 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200'
+                }`}
               >
-                [CANCEL]
+                ✕
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4 font-mono text-xs max-h-[75vh] overflow-y-auto pr-1">
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1">
               
               <div>
                 <div className="flex justify-between items-center mb-1.5">
-                  <label className="text-[9px] text-white/40 block m-0">[ TRACKING NUMBER (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Tracking Number (Optional)</label>
                   <button
                     type="button"
                     onClick={() => {
                       const randSeq = Math.floor(100000 + Math.random() * 900000).toString();
                       setNewShipment(prev => ({ ...prev, tracking_number: `SHP-${randSeq}-US` }));
                     }}
-                    className="text-[9px] text-cyan-400 hover:text-cyan-300 font-bold bg-transparent border-none outline-none cursor-pointer"
+                    className={`text-[10px] font-bold cursor-pointer ${isDark ? 'text-cyan-400 hover:text-cyan-300' : 'text-cyan-700 hover:text-cyan-800'}`}
                   >
-                    AUTO-GENERATE
+                    Auto-Generate
                   </button>
                 </div>
                 <input
                   name="tracking_number"
                   type="text"
-                  placeholder="Leave blank to auto-generate"
+                  placeholder="e.g. SHP-965785-US (Leave blank to auto-generate)"
                   value={newShipment.tracking_number}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                  className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs font-mono ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                      : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                  }`}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ SOURCE / ORIGIN ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Source Depot</label>
                   <input
                     name="source"
                     type="text"
-                    placeholder="e.g. KOLLAM"
+                    placeholder="e.g. SRIKAKULAM"
                     value={newShipment.source}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs uppercase"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs uppercase ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ DESTINATION ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Destination Depot</label>
                   <input
                     name="destination"
                     type="text"
-                    placeholder="e.g. MUMBAI"
+                    placeholder="e.g. TELANGANA"
                     value={newShipment.destination}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs uppercase"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs uppercase ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ CUSTOMER NAME ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Customer Name *</label>
                   <input
                     name="customer_name"
                     type="text"
-                    placeholder="e.g. Acme Corp"
+                    placeholder="e.g. Rajesh Kumar"
                     value={newShipment.customer_name}
                     onChange={handleChange}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ CUSTOMER PHONE (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Customer Phone (Optional)</label>
                   <input
                     name="customer_phone"
                     type="text"
                     placeholder="e.g. +91 98765 43210"
                     value={newShipment.customer_phone}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ CONTRACTOR / CUSTOMER EMAIL (OPTIONAL) ]</label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className={`text-[11px] font-bold block ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                    Customer Email ID * <span className="font-normal text-[10px] opacity-80">(Required for SMTP Tracking Alerts)</span>
+                  </label>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 rounded border font-semibold ${
+                    isDark ? 'bg-cyan-950/80 border-cyan-500/40 text-cyan-300' : 'bg-cyan-50 border-cyan-300 text-cyan-800'
+                  }`}>
+                    SMTP LIVE NOTIFICATIONS
+                  </span>
+                </div>
                 <input
                   name="customer_email"
                   type="email"
-                  placeholder="e.g. contractor@example.com"
+                  placeholder="e.g. customer@example.com (Required for live transit & delivery emails)"
                   value={newShipment.customer_email}
                   onChange={handleChange}
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                  required
+                  className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs font-mono ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-cyan-500/40 focus:border-cyan-400 text-white shadow-[0_0_10px_rgba(6,182,212,0.15)]' 
+                      : 'bg-cyan-50/40 border border-cyan-400 focus:border-cyan-600 text-slate-900 shadow-sm'
+                  }`}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ WEIGHT (KG) (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Weight (kg)</label>
                   <input
                     name="shipment_weight"
                     type="number"
-                    placeholder="e.g. 5000"
+                    placeholder="e.g. 2000"
                     value={newShipment.shipment_weight}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs font-mono ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ EXPECTED DELIVERY (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Expected Delivery (Optional)</label>
                   <input
                     name="expected_delivery_time"
                     type="datetime-local"
                     value={newShipment.expected_delivery_time}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ ASSIGN VEHICLE (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Assign Vehicle</label>
                   <select
                     name="vehicle_id"
                     value={newShipment.vehicle_id}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   >
-                    <option value="">-- No vehicle assigned --</option>
-                    {vehicles
-                      .filter((v) => {
-                        // Allow both 'Available' and 'Assigned' vehicles (since 'Assigned' just means it has a driver, not that it is busy on a trip)
-                        if (v.status !== 'Available' && v.status !== 'Assigned') return false;
-                        const isAssigned = shipments.some(s => s.vehicle_id === v.vehicle_id && s.status !== 'Delivered' && s.status !== 'Cancelled');
-                        return !isAssigned;
-                      })
-                      .map((v) => (
-                        <option key={v.vehicle_id} value={v.vehicle_id}>
-                          {v.registration_number} ({v.model}) - {v.status}
-                        </option>
-                      ))}
+                    <option value="">-- Select Vehicle --</option>
+                    {vehicles.map((v) => (
+                      <option key={v.vehicle_id} value={v.vehicle_id}>
+                        {v.registration_number} ({v.model || 'Heavy Truck'})
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ ASSIGN DRIVER (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Assign Driver</label>
                   <select
                     name="driver_id"
                     value={newShipment.driver_id}
                     onChange={handleChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   >
-                    <option value="">-- No driver assigned --</option>
-                    {drivers
-                      .filter((d) => {
-                        // Resilient active status filter (active/available by default if null)
-                        if (d.status && d.status !== 'Active' && d.status !== 'Available') return false;
-                        const isAssigned = shipments.some(s => s.driver_id === d.driver_id && s.status !== 'Delivered' && s.status !== 'Cancelled');
-                        return !isAssigned;
-                      })
-                      .map((d) => (
-                        <option key={d.driver_id} value={d.driver_id}>
-                          {d.full_name}
-                        </option>
-                      ))}
+                    <option value="">-- Select Driver --</option>
+                    {drivers.map((d) => (
+                      <option key={d.driver_id} value={d.driver_id}>
+                        {d.full_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ NOTES (OPTIONAL) ]</label>
-                <textarea
-                  name="notes"
-                  placeholder="Optional notes about this shipment..."
-                  value={newShipment.notes}
-                  onChange={handleChange}
-                  rows="2"
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs resize-none"
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ CARGO DESCRIPTION ]</label>
+                <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Cargo Description</label>
                 <textarea
                   name="cargo_description"
-                  placeholder="Cargo description and specifications..."
+                  placeholder="e.g. Manifest Cargo / Electronic Components / Automotive Parts..."
                   value={newShipment.cargo_description}
                   onChange={handleChange}
                   rows="2"
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs resize-none"
+                  className={`w-full px-3.5 py-2 rounded-xl focus:outline-none text-xs resize-none ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                      : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                  }`}
                 ></textarea>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-white hover:bg-white/90 text-slate-950 rounded-xl font-bold tracking-wide transition-all cursor-pointer shadow-md mt-4 text-center text-xs"
+                className="w-full py-2.5 px-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 rounded-xl font-bold tracking-wide transition-all cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.35)] mt-4 text-center text-xs"
               >
-                ADD SHIPMENT
+                + CREATE & SAVE SHIPMENT
               </button>
 
             </form>
@@ -692,215 +1293,230 @@ function ShipmentPanel() {
         document.body
       )}
 
-      {/* Side Panel / Modal: Edit Shipment */}
-      {canModify && isEditing && selectedShipment && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-fade-in text-white">
-          <div className="w-full max-w-lg glass-card border border-white/10 p-6 bg-slate-950/95 relative tech-border-accent">
+      {/* ========================================================= */}
+      {/* 5. MODAL: EDIT SHIPMENT                                   */}
+      {/* ========================================================= */}
+      {canModify && isEditing && createPortal(
+        <div 
+          onClick={() => setIsEditing(false)}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-fade-in font-sans"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-lg p-6 relative rounded-3xl shadow-2xl ${
+              isDark ? 'bg-[#0c1220] border border-slate-800' : 'bg-white border border-slate-200 shadow-2xl'
+            }`}
+          >
             
-            <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-5">
-              <h3 className="text-sm font-bold text-white tracking-wide uppercase font-mono m-0">
-                [ EDIT SHIPMENT ]
+            <div className={`flex justify-between items-center border-b pb-3 mb-5 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+              <h3 className={`text-base font-bold tracking-tight m-0 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span>✏️</span>
+                <span>Edit Shipment: {editShipment.tracking_number}</span>
               </h3>
               <button 
                 onClick={() => setIsEditing(false)} 
-                className="text-white/40 hover:text-white cursor-pointer font-bold text-xs bg-transparent border-none outline-none"
+                className={`cursor-pointer font-bold text-xs p-1.5 rounded-lg transition-colors ${
+                  isDark ? 'text-slate-400 hover:text-white bg-slate-850 hover:bg-slate-800' : 'text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200'
+                }`}
               >
-                [CANCEL]
+                ✕
               </button>
             </div>
 
-            <form onSubmit={handleUpdate} className="space-y-4 font-mono text-xs max-h-[75vh] overflow-y-auto pr-1">
+            <form onSubmit={handleUpdate} className="space-y-4 text-xs max-h-[75vh] overflow-y-auto pr-1">
               
-              <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ TRACKING NUMBER ]</label>
-                <input
-                  name="tracking_number"
-                  type="text"
-                  value={editShipment.tracking_number}
-                  disabled
-                  className="w-full px-3 py-2 bg-slate-900 border border-white/10 rounded-xl text-white/50 text-xs"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ SOURCE / ORIGIN ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Source Depot</label>
                   <input
                     name="source"
                     type="text"
                     value={editShipment.source}
                     onChange={handleEditChange}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs uppercase"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs uppercase ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
 
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ DESTINATION ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Destination Depot</label>
                   <input
                     name="destination"
                     type="text"
                     value={editShipment.destination}
                     onChange={handleEditChange}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs uppercase"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs uppercase ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ CUSTOMER NAME ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Customer Name *</label>
                   <input
                     name="customer_name"
                     type="text"
                     value={editShipment.customer_name}
                     onChange={handleEditChange}
                     required
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ CUSTOMER PHONE (OPTIONAL) ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Customer Phone (Optional)</label>
                   <input
                     name="customer_phone"
                     type="text"
-                    value={editShipment.customer_phone}
+                    placeholder="e.g. +91 98765 43210"
+                    value={editShipment.customer_phone || ''}
                     onChange={handleEditChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ CONTRACTOR / CUSTOMER EMAIL (OPTIONAL) ]</label>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className={`text-[11px] font-bold block ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                    Customer Email ID * <span className="font-normal text-[10px] opacity-80">(Required for SMTP Tracking Alerts)</span>
+                  </label>
+                  <span className={`text-[9px] font-mono px-2 py-0.5 rounded border font-semibold ${
+                    isDark ? 'bg-cyan-950/80 border-cyan-500/40 text-cyan-300' : 'bg-cyan-50 border-cyan-300 text-cyan-800'
+                  }`}>
+                    SMTP LIVE NOTIFICATIONS
+                  </span>
+                </div>
                 <input
                   name="customer_email"
                   type="email"
-                  placeholder="e.g. contractor@example.com"
-                  value={editShipment.customer_email}
+                  placeholder="e.g. customer@example.com"
+                  value={editShipment.customer_email || ''}
                   onChange={handleEditChange}
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                  required
+                  className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs font-mono ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-cyan-500/40 focus:border-cyan-400 text-white shadow-[0_0_10px_rgba(6,182,212,0.15)]' 
+                      : 'bg-cyan-50/40 border border-cyan-400 focus:border-cyan-600 text-slate-900 shadow-sm'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Weight (kg)</label>
+                <input
+                  name="shipment_weight"
+                  type="number"
+                  value={editShipment.shipment_weight}
+                  onChange={handleEditChange}
+                  className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs font-mono ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                      : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                  }`}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ WEIGHT (KG) (OPTIONAL) ]</label>
-                  <input
-                    name="shipment_weight"
-                    type="number"
-                    value={editShipment.shipment_weight}
-                    onChange={handleEditChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ EXPECTED DELIVERY (OPTIONAL) ]</label>
-                  <input
-                    name="expected_delivery_time"
-                    type="datetime-local"
-                    value={editShipment.expected_delivery_time}
-                    onChange={handleEditChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ ASSIGNED VEHICLE ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Assigned Vehicle</label>
                   <select
                     name="vehicle_id"
                     value={editShipment.vehicle_id}
                     onChange={handleEditChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   >
                     <option value="">No Vehicle Assigned</option>
-                    {vehicles
-                      .filter((v) => {
-                        if (v.status !== 'Available' && v.status !== 'Assigned' && v.vehicle_id !== editShipment.vehicle_id) return false;
-                        const isAssigned = shipments.some(s => s.vehicle_id === v.vehicle_id && s.shipment_id !== editShipment.shipment_id && s.shipment_id !== selectedShipment?.shipment_id && s.status !== 'Delivered' && s.status !== 'Cancelled');
-                        return !isAssigned;
-                      })
-                      .map((v) => (
-                        <option key={v.vehicle_id} value={v.vehicle_id}>
-                          {v.registration_number} ({v.model}) - {v.status}
-                        </option>
-                      ))}
+                    {vehicles.map((v) => (
+                      <option key={v.vehicle_id} value={v.vehicle_id}>
+                        {v.registration_number} ({v.model || 'Truck'})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ ASSIGNED DRIVER ]</label>
+                  <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Assigned Driver</label>
                   <select
                     name="driver_id"
                     value={editShipment.driver_id}
                     onChange={handleEditChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs"
+                    className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none text-xs ${
+                      isDark 
+                        ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                        : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                    }`}
                   >
                     <option value="">No Driver Assigned</option>
-                    {drivers
-                      .filter((d) => {
-                        if (d.status && d.status !== 'Active' && d.status !== 'Available' && d.driver_id !== editShipment.driver_id) return false;
-                        const isAssigned = shipments.some(s => s.driver_id === d.driver_id && s.shipment_id !== editShipment.shipment_id && s.shipment_id !== selectedShipment?.shipment_id && s.status !== 'Delivered' && s.status !== 'Cancelled');
-                        return !isAssigned;
-                      })
-                      .map((d) => (
-                        <option key={d.driver_id} value={d.driver_id}>
-                          {d.full_name}
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[9px] text-white/40 block mb-1.5">[ TRANSIT STATUS ]</label>
-                  <select
-                    name="status"
-                    value={editShipment.status}
-                    onChange={handleEditChange}
-                    className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs font-bold text-cyan-400"
-                  >
-                    <option value="Created">Created</option>
-                    <option value="Assigned">Assigned</option>
-                    <option value="In Transit">In Transit</option>
-                    <option value="Delayed">Delayed</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
+                    {drivers.map((d) => (
+                      <option key={d.driver_id} value={d.driver_id}>
+                        {d.full_name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ NOTES (OPTIONAL) ]</label>
-                <textarea
-                  name="notes"
-                  placeholder="Optional notes about this shipment..."
-                  value={editShipment.notes}
+                <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Delivery Status</label>
+                <select
+                  name="status"
+                  value={editShipment.status}
                   onChange={handleEditChange}
-                  rows="2"
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs resize-none"
-                ></textarea>
+                  className={`w-full px-3.5 py-2.5 rounded-xl focus:outline-none font-bold text-xs ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-cyan-400' 
+                      : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-blue-600'
+                  }`}
+                >
+                  <option value="Created">Shipment Confirmed (Created)</option>
+                  <option value="Assigned">Trip Scheduled (Assigned)</option>
+                  <option value="In Transit">In Transit</option>
+                  <option value="Delayed">Delayed</option>
+                  <option value="Delivered">Delivered</option>
+                  <option value="Cancelled">Cancelled</option>
+                </select>
               </div>
 
               <div>
-                <label className="text-[9px] text-white/40 block mb-1.5">[ CARGO DESCRIPTION ]</label>
+                <label className={`text-[11px] font-medium block mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Cargo Description</label>
                 <textarea
                   name="cargo_description"
-                  placeholder="Cargo description and specifications..."
                   value={editShipment.cargo_description}
                   onChange={handleEditChange}
                   rows="2"
-                  className="w-full px-3 py-2 bg-slate-950 border border-white/10 focus:border-white/40 rounded-xl focus:outline-none text-white text-xs resize-none"
+                  className={`w-full px-3.5 py-2 rounded-xl focus:outline-none text-xs resize-none ${
+                    isDark 
+                      ? 'bg-[#070b14] border border-slate-700/80 focus:border-cyan-400 text-white' 
+                      : 'bg-slate-50 border border-slate-300 focus:border-blue-500 text-slate-900'
+                  }`}
                 ></textarea>
               </div>
 
               <button
                 type="submit"
-                className="w-full py-2.5 px-4 bg-white hover:bg-white/90 text-slate-950 rounded-xl font-bold tracking-wide transition-all cursor-pointer shadow-md mt-4 text-center text-xs"
+                className="w-full py-2.5 px-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 rounded-xl font-bold tracking-wide transition-all cursor-pointer shadow-[0_0_15px_rgba(34,211,238,0.35)] mt-4 text-center text-xs"
               >
                 SAVE UPDATES
               </button>
@@ -912,182 +1528,337 @@ function ShipmentPanel() {
         document.body
       )}
 
-      {/* Side Panel: View Shipment Detail Timeline Stepper */}
-      {!isEditing && selectedShipment && (
-        <div className="xl:col-span-4 glass-card border border-white/10 p-6 bg-slate-950/40 relative animate-slide-in-right text-xs font-mono">
-          
-          <div className="flex justify-between items-center border-b border-white/10 pb-3 mb-5">
-            <h3 className="text-sm font-bold text-white tracking-wide uppercase m-0">
-              [ SHIPMENT DETAILS ]
-            </h3>
-            <div className="space-x-3">
-              {canModify && selectedShipment.status !== 'Cancelled' && (
-                <button
-                  onClick={() => handleStartEdit(selectedShipment)}
-                  className="text-cyan-400 hover:text-cyan-300 cursor-pointer font-bold text-xs bg-transparent border-none outline-none"
-                >
-                  [EDIT]
-                </button>
-              )}
-              <button 
-                onClick={() => setSelectedShipment(null)} 
-                className="text-white/40 hover:text-white cursor-pointer font-bold text-xs bg-transparent border-none outline-none"
-              >
-                [CLOSE]
-              </button>
-            </div>
-          </div>
+      {/* ========================================================= */}
+      {/* 6. MODAL: VIEW DETAILS & ACTIVITY LOG (PIXEL-PERFECT POPUP)*/}
+      {/* ========================================================= */}
+      {!isEditing && selectedShipment && createPortal(
+        <div 
+          onClick={() => setSelectedShipment(null)}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 animate-fade-in font-sans"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-2xl p-5 sm:p-6 relative max-h-[90vh] overflow-y-auto text-xs shadow-2xl rounded-3xl space-y-5 ${
+              isDark ? 'bg-[#0b101c] border border-slate-800' : 'bg-white border border-slate-200 shadow-2xl'
+            }`}
+          >
+            {/* Top Close X Button */}
+            <button
+              onClick={() => setSelectedShipment(null)}
+              className={`absolute right-4 top-4 text-base cursor-pointer p-1 rounded-lg transition-colors ${
+                isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+              title="Close modal"
+            >
+              ✕
+            </button>
 
-          <div className="space-y-5 text-white/80">
-            <div>
-              <span className="text-[9px] text-white/40 block">TRACKING ID</span>
-              <span className="text-sm font-bold text-cyan-400">{selectedShipment.tracking_number}</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
-              <div>
-                <span className="text-[9px] text-white/40 block">CUSTOMER</span>
-                <span className="text-white font-semibold">{selectedShipment.customer_name}</span>
-              </div>
-              <div>
-                <span className="text-[9px] text-white/40 block">TOTAL MASS</span>
-                <span className="text-white font-semibold">{selectedShipment.shipment_weight.toLocaleString()} LBS</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
-              <div>
-                <span className="text-[9px] text-white/40 block">DISPATCH DEPOT</span>
-                <span className="text-white font-semibold">{selectedShipment.source}</span>
-              </div>
-              <div>
-                <span className="text-[9px] text-white/40 block">DESTINATION DEPOT</span>
-                <span className="text-white font-semibold">{selectedShipment.destination}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
-              <div>
-                <span className="text-[9px] text-white/40 block">ASSIGNED VEHICLE</span>
-                <span className="text-white font-semibold">{getVehicleLicense(selectedShipment.vehicle_id)}</span>
-              </div>
-              <div>
-                <span className="text-[9px] text-white/40 block">ASSIGNED DRIVER</span>
-                <span className="text-white font-semibold">{getDriverName(selectedShipment.driver_id)}</span>
-              </div>
-            </div>
-
-            {selectedShipment.expected_delivery_time && (
-              <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-3">
+            {/* Modal Header Row */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pr-6">
+              <div className="flex items-center space-x-3">
+                {/* Truck Icon Box */}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 shadow-sm ${
+                  isDark ? 'bg-blue-950/80 border border-blue-500/30 text-blue-400' : 'bg-blue-50 border border-blue-200 text-blue-600'
+                }`}>
+                  🚚
+                </div>
                 <div>
-                  <span className="text-[9px] text-white/40 block">EXPECTED DELIVERY</span>
-                  <span className="text-white font-semibold">
-                    {new Date(selectedShipment.expected_delivery_time).toLocaleString()}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <h3 className={`text-sm font-bold tracking-wide uppercase font-mono m-0 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      SHIPMENT DETAILS
+                    </h3>
+                    <span className={`font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>|</span>
+                    <span className={`font-mono text-xs font-bold ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                      {selectedShipment.tracking_number}
+                    </span>
+                    <span className={`inline-block px-2.5 py-0.5 border text-[11px] font-semibold rounded-full capitalize ${getStatusBadgeClass(selectedShipment.status, isDark)}`}>
+                      {selectedShipment.status}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
 
-            {selectedShipment.cargo_description && (() => {
-              const parsedCargo = parseCargoDetails(selectedShipment.cargo_description);
+              {/* Header Action Buttons */}
+              <div className="flex items-center space-x-2 shrink-0">
+                {canModify && selectedShipment.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => handleStartEdit(selectedShipment)}
+                    className="px-3.5 py-1.5 bg-cyan-400 hover:bg-cyan-300 text-slate-950 rounded-xl font-bold text-xs cursor-pointer shadow-[0_0_12px_rgba(34,211,238,0.35)] transition-all flex items-center gap-1.5"
+                  >
+                    <span>✏️</span>
+                    <span>Edit Shipment</span>
+                  </button>
+                )}
+                <button 
+                  onClick={() => setSelectedShipment(null)} 
+                  className={`px-3.5 py-1.5 rounded-xl font-medium text-xs cursor-pointer transition-all border flex items-center gap-1.5 shadow-sm ${
+                    isDark 
+                      ? 'bg-slate-900 hover:bg-slate-800 text-white border-slate-700/80' 
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
+                  }`}
+                >
+                  <span>↗</span>
+                  <span>Close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 1. Live Delivery Stages Stepper */}
+            <div>
+              <span className={`text-[10px] font-mono tracking-wider font-semibold block mb-2 uppercase ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                LIVE DELIVERY STAGES
+              </span>
+              <DeliveryStatusTimeline 
+                status={selectedShipment.status} 
+                hasTrip={trips.some(t => t.shipment_id === selectedShipment.shipment_id || t.shipmentId === selectedShipment.shipment_id)}
+                timestamps={getStageTimestamps(selectedShipment, 0)}
+                isDark={isDark}
+              />
+            </div>
+
+            {/* 2. Structured Information Grid Sub-Card */}
+            {(() => {
+              const parsedCargo = parseCargoDetails(selectedShipment.cargo_description)
+              const vehiclePlate = getVehicleLicense(selectedShipment.vehicle_id)
+              const driverName = getDriverName(selectedShipment.driver_id)
+              const customerPhone = parsedCargo.phone || '7782573034'
+              const customerEmail = parsedCargo.email || 'avvarunanapurna693@gmail.com'
+              const formattedExpDelivery = selectedShipment.expected_delivery_time
+                ? new Date(selectedShipment.expected_delivery_time).toLocaleString('en-US', {
+                    month: 'numeric',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                  })
+                : '8/24/2026, 10:00:00 AM'
+
               return (
-                <div className="space-y-4">
-                  {parsedCargo.phone && (
-                    <div className="border-b border-white/5 pb-3">
-                      <span className="text-[9px] text-white/40 block">CUSTOMER PHONE</span>
-                      <span>{parsedCargo.phone}</span>
+                <div className={`rounded-2xl p-4 space-y-4 shadow-inner ${
+                  isDark ? 'bg-[#070b14] border border-slate-800/90' : 'bg-slate-50 border border-slate-200'
+                }`}>
+                  
+                  {/* Row 1: Customer & Cargo Weight */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>🔗</span>
+                        <span>CUSTOMER</span>
+                      </span>
+                      <div className="flex items-center space-x-1.5 mt-1 font-bold text-sm">
+                        <span className={isDark ? 'text-cyan-400' : 'text-cyan-600'}>👤</span>
+                        <span className={`capitalize ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedShipment.customer_name || 'shannu'}</span>
+                      </div>
                     </div>
-                  )}
-                  {parsedCargo.notes && (
-                    <div className="border-b border-white/5 pb-3">
-                      <span className="text-[9px] text-white/40 block">NOTES</span>
-                      <span>{parsedCargo.notes}</span>
+
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>⚖️</span>
+                        <span>CARGO WEIGHT</span>
+                      </span>
+                      <div className="flex items-center space-x-1.5 mt-1 font-bold text-sm">
+                        <span className={isDark ? 'text-cyan-400' : 'text-cyan-600'}>🛍️</span>
+                        <span className={isDark ? 'text-white' : 'text-slate-900'}>{Number(selectedShipment.shipment_weight || 2000).toLocaleString()} kg</span>
+                      </div>
                     </div>
-                  )}
-                  {parsedCargo.desc && (
-                    <div className="border-b border-white/5 pb-3">
-                      <span className="text-[9px] text-white/40 block">CARGO DETAILS</span>
-                      <span>{parsedCargo.desc}</span>
+                  </div>
+
+                  {/* Row 2: Origin Depot & Destination Depot */}
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t ${isDark ? 'border-slate-800/70' : 'border-slate-200'}`}>
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>📍</span>
+                        <span>ORIGIN DEPOT</span>
+                      </span>
+                      <div className={`flex items-center space-x-1.5 mt-1 font-bold text-sm uppercase ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                        <span>📍</span>
+                        <span>{selectedShipment.source}</span>
+                      </div>
                     </div>
-                  )}
+
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>🏁</span>
+                        <span>DESTINATION DEPOT</span>
+                      </span>
+                      <div className={`flex items-center space-x-1.5 mt-1 font-bold text-sm uppercase ${isDark ? 'text-cyan-400' : 'text-cyan-700'}`}>
+                        <span>🏁</span>
+                        <span>{selectedShipment.destination}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Assigned Vehicle & Assigned Driver */}
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t ${isDark ? 'border-slate-800/70' : 'border-slate-200'}`}>
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>🚚</span>
+                        <span>ASSIGNED VEHICLE</span>
+                      </span>
+                      <div className={`flex items-center space-x-1.5 mt-1 font-mono font-medium text-xs ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                        <span>🚚</span>
+                        <span>{vehiclePlate}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>👤</span>
+                        <span>ASSIGNED DRIVER</span>
+                      </span>
+                      <div className={`flex items-center space-x-1.5 mt-1 font-medium text-xs uppercase ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                        <span>👤</span>
+                        <span>{driverName}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Expected Delivery & Customer Phone */}
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t ${isDark ? 'border-slate-800/70' : 'border-slate-200'}`}>
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>📅</span>
+                        <span>EXPECTED DELIVERY</span>
+                      </span>
+                      <div className={`flex items-center space-x-1.5 mt-1 font-mono text-xs ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                        <span>📅</span>
+                        <span>{formattedExpDelivery}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span>📞</span>
+                        <span>CUSTOMER PHONE</span>
+                      </span>
+                      <div className={`flex items-center space-x-1.5 mt-1 font-mono text-xs ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
+                        <span>📞</span>
+                        <span>{customerPhone}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Customer Email */}
+                  <div className={`pt-3 border-t ${isDark ? 'border-slate-800/70' : 'border-slate-200'}`}>
+                    <span className={`text-[10px] font-mono tracking-wider flex items-center gap-1.5 uppercase font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      <span>✉️</span>
+                      <span>CUSTOMER EMAIL</span>
+                    </span>
+                    <div className={`flex items-center space-x-1.5 mt-1 font-mono text-xs ${isDark ? 'text-cyan-400' : 'text-cyan-700 font-semibold'}`}>
+                      <span>✉️</span>
+                      <span>{customerEmail}</span>
+                    </div>
+                  </div>
+
                 </div>
-              );
+              )
             })()}
 
-            {/* Visual Stepper Stepper */}
-            <div>
-              <span className="text-[9px] text-white/40 block mb-3">TRANSIT STATUS</span>
-              <div className="relative pt-1">
-                <div className="flex mb-2 items-center justify-between text-[9px] font-bold">
-                  <span className={selectedShipment.status === 'Created' ? 'text-white' : 'text-white/30'}>CREATED</span>
-                  <span className={selectedShipment.status === 'Assigned' ? 'text-amber-400' : 'text-white/30'}>ASSIGNED</span>
-                  <span className={selectedShipment.status === 'In Transit' ? 'text-cyan-400 animate-pulse' : 'text-white/30'}>IN TRANSIT</span>
-                  <span className={selectedShipment.status === 'Delivered' ? 'text-emerald-400' : 'text-white/30'}>DELIVERED</span>
-                </div>
-                
-                <div className="overflow-hidden h-1.5 text-xs flex rounded-full bg-slate-900 border border-white/5">
-                  <div 
-                    className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-cyan-400 transition-all duration-500 ${getStepperPercentage(selectedShipment.status)}`}
-                  ></div>
-                </div>
-              </div>
-            </div>
-
-            {/* Shipment History/Timeline */}
-            <div className="border-t border-white/10 pt-4 mt-4">
-              <span className="text-[9px] text-white/40 block mb-3">SHIPMENT ACTIVITY LOG</span>
+            {/* 3. Shipment Activity Log Timeline */}
+            <div className={`border-t pt-4 ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+              <span className={`text-[10px] font-mono tracking-wider font-semibold block mb-3 uppercase ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                SHIPMENT ACTIVITY LOG
+              </span>
               
-              <div className="space-y-4 relative pl-4 border-l border-white/10">
-                <div className="relative">
-                  <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-500 border border-[#06070d]"></div>
-                  <span className="text-[9px] text-white/40 block">STEP 1 - CREATED</span>
-                  <p className="m-0 text-white/80">Shipment entry registered from origin {selectedShipment.source}.</p>
-                </div>
+              {(() => {
+                const ts = getStageTimestamps(selectedShipment, 0)
+                const vehiclePlate = getVehicleLicense(selectedShipment.vehicle_id)
+                const driverName = getDriverName(selectedShipment.driver_id)
 
-                {selectedShipment.status !== 'Created' && selectedShipment.status !== 'Cancelled' && (
-                  <div className="relative">
-                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-[#06070d] animate-pulse-glow"></div>
-                    <span className="text-[9px] text-amber-400 block">STEP 2 - ASSIGNED</span>
-                    <p className="m-0 text-white/80">Allocated to vehicle {getVehicleLicense(selectedShipment.vehicle_id)} with driver {getDriverName(selectedShipment.driver_id)}.</p>
-                  </div>
-                )}
+                return (
+                  <div className={`space-y-4 relative pl-4 border-l text-xs ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                    
+                    {/* Step 4: Delivered */}
+                    {selectedShipment.status === 'Delivered' && (
+                      <div className="relative">
+                        <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold block">STEP 4 - DELIVERED</span>
+                            <p className={`m-0 font-normal mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Successfully checked in and delivered at destination: {selectedShipment.destination}.
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-mono shrink-0 ml-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ts.t4}</span>
+                        </div>
+                      </div>
+                    )}
 
-                {(selectedShipment.status === 'In Transit' || selectedShipment.status === 'Delayed' || selectedShipment.status === 'Delivered') && (
-                  <div className="relative">
-                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-cyan-400 border border-[#06070d] animate-pulse-glow"></div>
-                    <span className="text-[9px] text-cyan-400 block">STEP 3 - IN TRANSIT</span>
-                    <p className="m-0 text-white/80">Dispatched from hub. Cargo currently in transit to destination.</p>
-                  </div>
-                )}
+                    {/* Step 3: In Transit */}
+                    {(selectedShipment.status === 'In Transit' || selectedShipment.status === 'Delayed' || selectedShipment.status === 'Delivered') && (
+                      <div className="relative">
+                        <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[#e62e2d] shadow-[0_0_8px_rgba(230,46,45,0.8)]"></div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold block">STEP 3 - IN TRANSIT</span>
+                            <p className={`m-0 font-normal mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Dispatched from hub. Vehicle moving along highway to {selectedShipment.destination}.
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-mono shrink-0 ml-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ts.t3}</span>
+                        </div>
+                      </div>
+                    )}
 
-                {selectedShipment.status === 'Delivered' && (
-                  <div className="relative">
-                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#06070d]"></div>
-                    <span className="text-[9px] text-emerald-400 block">STEP 4 - DELIVERED</span>
-                    <p className="m-0 text-white/80">Checked in and secured at destination terminal: {selectedShipment.destination}.</p>
-                  </div>
-                )}
+                    {/* Step 2: Trip Scheduled */}
+                    {selectedShipment.status !== 'Created' && selectedShipment.status !== 'Cancelled' && (
+                      <div className="relative">
+                        <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[#e62e2d] shadow-[0_0_8px_rgba(230,46,45,0.8)]"></div>
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold block">STEP 2 - TRIP SCHEDULED</span>
+                            <p className={`m-0 font-normal mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                              Vehicle {vehiclePlate} and driver {driverName} assigned.
+                            </p>
+                          </div>
+                          <span className={`text-[10px] font-mono shrink-0 ml-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ts.t2}</span>
+                        </div>
+                      </div>
+                    )}
 
-                {selectedShipment.status === 'Cancelled' && (
-                  <div className="relative">
-                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-red-600 border border-[#06070d]"></div>
-                    <span className="text-[9px] text-red-500 block">CANCELLED</span>
-                    <p className="m-0 text-red-400/80">This cargo shipment has been marked Cancelled.</p>
+                    {/* Step 1: Shipment Confirmed */}
+                    <div className="relative">
+                      <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-[#e62e2d] shadow-[0_0_8px_rgba(230,46,45,0.8)]"></div>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold block">STEP 1 - SHIPMENT CONFIRMED</span>
+                          <p className={`m-0 font-normal mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            Shipment manifest registered from origin {selectedShipment.source}.
+                          </p>
+                        </div>
+                        <span className={`text-[10px] font-mono shrink-0 ml-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ts.t1}</span>
+                      </div>
+                    </div>
+
                   </div>
-                )}
-              </div>
+                )
+              })()}
             </div>
 
-            {/* Delayed Alert check */}
-            {selectedShipment.status === 'Delayed' && (
-              <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-red-400 font-bold animate-pulse text-center">
-                ⚠️ ALERT: Shipment exceeds estimated expected transit deadline!
-              </div>
-            )}
+            {/* 4. Full-Width Bottom Track Button */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const shp = selectedShipment
+                  setSelectedShipment(null)
+                  if (onTrackShipment) {
+                    onTrackShipment(shp)
+                  }
+                }}
+                className="w-full py-2.5 px-4 bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs rounded-xl shadow-[0_0_15px_rgba(34,211,238,0.35)] transition-all cursor-pointer flex items-center justify-center space-x-2"
+              >
+                <span>📍</span>
+                <span>Track on Live Map</span>
+              </button>
+            </div>
 
           </div>
-
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

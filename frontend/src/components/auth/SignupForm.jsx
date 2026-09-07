@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import api from '../../api/axios'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
+import { useTheme } from '../../context/ThemeContext'
 import TruckLoader from '../ui/TruckLoader'
 
 const ROLE_MAP = {
@@ -12,21 +13,31 @@ const ROLE_MAP = {
   'ADMIN': 'Admin'
 }
 
-function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, setIsSubmitting }) {
-  const [form, setForm] = useState({ name: '', email: '', password: '', phone: '' })
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  
-  // OTP Verification states
-  const [otpCode, setOtpCode] = useState('')
-  const [sentOtp, setSentOtp] = useState('')
+const ROLES = [
+  { id: 'MANAGER', label: 'MANAGER' },
+  { id: 'DISPATCHER', label: 'DISPATCHER' },
+  { id: 'DRIVER', label: 'DRIVER' },
+  { id: 'ADMIN', label: 'ADMIN' },
+]
 
+function SignupForm() {
+  const { isDark } = useTheme()
   const { login } = useAuth()
   const { addToast } = useToast()
   const navigate = useNavigate()
 
-  // OTP Verification view panel timer hooks
+  const [selectedRole, setSelectedRole] = useState('MANAGER')
+  const [form, setForm] = useState({ name: '', email: '', phone: '', password: '' })
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [agreeTerms, setAgreeTerms] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // OTP Verification states
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [sentOtp, setSentOtp] = useState('')
   const [timer, setTimer] = useState(300)
 
   useEffect(() => {
@@ -43,16 +54,7 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
     setForm((current) => ({ ...current, [name]: value }))
   }
 
-  // Password rules validation
-  const validatePassword = (pwd) => {
-    const minLength = pwd.length >= 8
-    const hasUpper = /[A-Z]/.test(pwd)
-    const hasLower = /[a-z]/.test(pwd)
-    const hasDigit = /[0-9]/.test(pwd)
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
-    return minLength && hasUpper && hasLower && hasDigit && hasSpecial
-  }
-
+  // Password rules validation checklist
   const checks = {
     length: form.password.length >= 8,
     upper: /[A-Z]/.test(form.password),
@@ -61,57 +63,57 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
     special: /[!@#$%^&*(),.?":{}|<>]/.test(form.password)
   }
 
-  // Details form submit -> trigger verification OTP
-  const handleDetailsSubmit = (event) => {
+  const isPasswordValid = checks.length && checks.upper && checks.lower && checks.digit && checks.special
+
+  // Handle Form Submit -> Request OTP Key
+  const handleDetailsSubmit = async (event) => {
     if (event) event.preventDefault()
 
-    if (!validatePassword(form.password)) {
-      addToast('❌ PASSWORD STRENGTH FAILURE: Key rules not satisfied.', 'error', 'top-right')
+    if (!isPasswordValid) {
+      addToast('❌ PASSWORD POLICY: Please satisfy all password requirements.', 'error', 'top-right')
       return
     }
 
     if (form.password !== confirmPassword) {
-      addToast('❌ INTEGRITY CHECK FAILURE: Passwords do not match.', 'error', 'top-right')
+      addToast('❌ PASSWORDS MISMATCH: Please ensure both password fields match.', 'error', 'top-right')
       return
     }
 
-    // Generate random 6-digit OTP
+    if (!agreeTerms) {
+      addToast('⚠️ COMPLIANCE: You must accept the terms and compliance policy.', 'warning', 'top-right')
+      return
+    }
+
+    setIsSubmitting(true)
     const generatedCode = Math.floor(100000 + Math.random() * 900000).toString()
 
-    // Dispatch real email via SMTP
-    api.post('/auth/send-otp', { email: form.email, otp: generatedCode })
-      .then((res) => {
-        setSentOtp(generatedCode)
-        setOtpSent(true)
-        setOtpCode('')
-        if (res.data.sent) {
-          addToast(`📧 SMTP DISPATCHED: Verification key sent to your inbox.`, 'success', 'top-right')
-        } else {
-          addToast(`⚠️ OFFLINE BYPASS: Verification key is [${generatedCode}] (Set SMTP credentials in .env for real email).`, 'warning', 'top-right')
-        }
-      })
-      .catch((err) => {
-        console.error('[FleetFlow Mailer] OTP request failed: ', err)
-        // If it is a network error (server is offline), we fallback to offline bypass
-        if (!err.response || err.code === 'ERR_NETWORK') {
-          setSentOtp(generatedCode)
-          setOtpSent(true)
-          setOtpCode('')
-          addToast(`⚠️ OFFLINE BYPASS: Verification key is [${generatedCode}] (Set SMTP credentials in .env for real email).`, 'warning', 'top-right')
-        } else {
-          // If the server is online but returned an error (e.g. Email already registered)
-          const errorMsg = err.response?.data?.detail || 'Could not send verification key.'
-          addToast(`❌ ERROR: ${errorMsg}`, 'error', 'top-right')
-        }
-      })
+    try {
+      const res = await api.post('/auth/send-otp', { email: form.email, otp: generatedCode })
+      setSentOtp(generatedCode)
+      setOtpSent(true)
+      setOtpCode('')
+      if (res.data?.sent) {
+        addToast(`📧 SMTP DISPATCHED: Verification security key sent to ${form.email}`, 'success', 'top-right')
+      } else {
+        addToast(`⚠️ VERIFICATION KEY: ${generatedCode} (Local bypass mode)`, 'warning', 'top-right')
+      }
+    } catch (err) {
+      console.warn('OTP request fallback:', err)
+      setSentOtp(generatedCode)
+      setOtpSent(true)
+      setOtpCode('')
+      addToast(`⚠️ OFFLINE MODE: Verification key is [${generatedCode}]`, 'warning', 'top-right')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  // OTP verify -> execute actual database write
+  // Handle OTP Verify -> Complete Registration
   const handleVerifyOtp = async (event) => {
     event.preventDefault()
 
-    if (otpCode !== sentOtp) {
-      addToast('❌ VERIFICATION REJECTED: Invalid security key entered.', 'error', 'top-right')
+    if (otpCode.trim() !== sentOtp.trim()) {
+      addToast('❌ VERIFICATION FAILED: Invalid security code entered.', 'error', 'top-right')
       return
     }
 
@@ -121,38 +123,26 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
       email: form.email,
       password: form.password,
       phone: form.phone || null,
-      role: ROLE_MAP[roleName] || 'Driver'
+      role: ROLE_MAP[selectedRole] || 'Driver'
     }
 
     try {
-      // 1. Sign up the user
       await api.post('/auth/signup', payload)
-
-      // 2. Redirect to login page for manual login verification
-      addToast('✅ ACCOUNT CREATED: Your profile has been registered. Please log in with your email and password.', 'success', 'top-right')
+      addToast('✅ ACCOUNT CREATED: Profile registered successfully! Please log in.', 'success', 'top-right')
       navigate('/login')
     } catch (error) {
-      console.error('Registration failed:', error)
+      console.error('Registration error:', error)
       if (!error.response || error.code === 'ERR_NETWORK') {
-        console.warn('Backend server offline. Proceeding with client-side signup bypass.')
-        login({ 
-          email: form.email, 
+        login({
+          email: form.email,
           full_name: form.name.toUpperCase(),
-          role: ROLE_MAP[roleName] || 'Driver'
+          role: ROLE_MAP[selectedRole] || 'Driver'
         }, 'mock-jwt-token', 'mock-refresh-token')
         navigate('/dashboard')
-        addToast('✅ REGISTERED SUCCESSFULLY: Mock operator profile initialized. Logged in directly!', 'success', 'top-right')
+        addToast('✅ REGISTERED: Offline profile created. Logged in directly!', 'success', 'top-right')
       } else {
-        let errorMsg = 'Could not register account.'
-        const detail = error.response?.data?.detail
-        if (detail) {
-          if (typeof detail === 'string') {
-            errorMsg = detail
-          } else if (Array.isArray(detail)) {
-            errorMsg = detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(', ')
-          }
-        }
-        addToast(`❌ SIGNUP ERROR: ${errorMsg}`, 'error', 'top-right')
+        const errorMsg = error.response?.data?.detail || 'Could not register operator account.'
+        addToast(`❌ SIGNUP ERROR: ${typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg)}`, 'error', 'top-right')
         setOtpSent(false)
       }
     } finally {
@@ -160,41 +150,46 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
     }
   }
 
-  // If submitting, swap inputs with centered loader
-  if (isSubmitting) {
-    return (
-      <div className="min-h-[440px] flex flex-col justify-center items-center font-mono select-none">
-        <TruckLoader />
-        <span className="text-[10px] tracking-widest font-semibold animate-pulse uppercase mt-4 text-center text-indigo-600">
-          PROVISIONING OPERATOR KEY...
-        </span>
-      </div>
-    )
-  }
-
-
-
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`
   }
 
+  // Submitting Loader
+  if (isSubmitting) {
+    return (
+      <div className="min-h-[380px] flex flex-col justify-center items-center font-mono select-none">
+        <TruckLoader />
+        <span className={`text-[10.5px] tracking-widest font-black uppercase mt-4 animate-pulse ${
+          isDark ? 'text-cyan-400' : 'text-blue-600'
+        }`}>
+          PROVISIONING OPERATOR KEY...
+        </span>
+      </div>
+    )
+  }
+
+  // OTP Verification Screen
   if (otpSent) {
     return (
-      <form onSubmit={handleVerifyOtp} className="space-y-6 text-sm font-sans select-none min-h-[440px] flex flex-col justify-between">
-        <div className="space-y-4">
-          <div className="text-center pt-2">
-            <span className="text-[#00f0ff] text-xs font-bold tracking-widest uppercase block mb-1">
-              [ ENTER VERIFICATION CODE ]
+      <form onSubmit={handleVerifyOtp} className="space-y-4 text-xs font-sans min-h-[360px] flex flex-col justify-between">
+        <div className="space-y-3">
+          <div className="text-center pt-1">
+            <span className={`text-[11px] font-mono font-black tracking-widest uppercase block mb-1 ${
+              isDark ? 'text-cyan-400' : 'text-blue-600'
+            }`}>
+              [ ENTER 6-DIGIT SECURITY KEY ]
             </span>
-            <p className="text-white/50 text-[11px] leading-relaxed m-0">
-              We have dispatched a 6-digit verification key to your email address:
+            <p className={`text-xs leading-relaxed m-0 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              Verification code dispatched to:
             </p>
-            <span className="text-white text-xs font-bold block mt-1">{form.email}</span>
+            <span className={`text-xs font-mono font-black block mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              {form.email}
+            </span>
           </div>
 
-          <div className="relative pt-2">
+          <div className="relative pt-1">
             <input
               type="text"
               placeholder="0 0 0 0 0 0"
@@ -202,47 +197,54 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
               required
-              className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/30 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 text-center tracking-[0.5em] text-lg font-bold"
+              className={`w-full px-3 py-2.5 rounded-xl text-center tracking-[0.4em] text-lg font-mono font-black outline-none border transition-all ${
+                isDark
+                  ? 'bg-[#060e22] border-cyan-500/40 text-cyan-300 focus:border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
+                  : 'bg-white border-blue-300 text-blue-900 focus:border-blue-500 shadow-sm'
+              }`}
             />
           </div>
 
-          <div className="text-center space-y-1 pt-2">
-            <p className="text-[11px] text-white/50 m-0">
+          <div className="text-center space-y-1 pt-1">
+            <p className={`text-[11px] m-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {timer > 0 ? (
-                <span>The code will expire in <span className="text-[#00f0ff] font-bold">{formatTime(timer)}</span></span>
+                <span>Expires in <span className={isDark ? 'text-cyan-400 font-bold' : 'text-blue-600 font-bold'}>{formatTime(timer)}</span></span>
               ) : (
-                <span className="text-rose-400 font-semibold">The verification code has expired.</span>
+                <span className="text-rose-500 font-bold">The code has expired.</span>
               )}
             </p>
-            <p className="text-[11px] text-white/50 m-0">
-              {timer > 0 ? (
-                <span>Resend code in {formatTime(timer)}</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleDetailsSubmit}
-                  className="text-[#00f0ff] hover:text-[#00d2e0] hover:underline bg-transparent border-none cursor-pointer text-[11px]"
-                >
-                  Didn't receive the code? Resend code
-                </button>
-              )}
-            </p>
+            {timer === 0 && (
+              <button
+                type="button"
+                onClick={handleDetailsSubmit}
+                className="text-xs font-bold text-cyan-400 hover:underline cursor-pointer"
+              >
+                Resend security code
+              </button>
+            )}
           </div>
         </div>
 
         <div className="space-y-2">
           <button
             type="submit"
-            className="w-full py-3 px-4 font-bold bg-[#00f0ff] hover:bg-[#00d2e0] text-[#06070d] rounded-xl active:scale-[0.99] transition-all duration-200 cursor-pointer text-sm shadow-[0_0_15px_rgba(0,240,255,0.35)]"
+            className={`w-full py-3 px-4 font-black rounded-xl transition-all cursor-pointer shadow-lg active:scale-[0.99] text-xs uppercase tracking-wider ${
+              isDark
+                ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-500 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.5)]'
+                : 'bg-gradient-to-r from-[#00b4d8] to-[#0077b6] text-white'
+            }`}
           >
-            Verify & Proceed
+            Verify Security Code & Complete
           </button>
+          
           <button
             type="button"
             onClick={() => setOtpSent(false)}
-            className="w-full py-2.5 px-4 font-semibold bg-slate-900/60 border border-white/10 text-white hover:bg-slate-800 rounded-xl transition-all duration-200 cursor-pointer text-xs"
+            className={`w-full py-2 px-3 font-mono text-[11px] rounded-lg border transition-colors cursor-pointer ${
+              isDark ? 'bg-slate-900 border-slate-700 text-slate-300 hover:text-white' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}
           >
-            Back to Details
+            ← Modify Registration Info
           </button>
         </div>
       </form>
@@ -250,11 +252,86 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
   }
 
   return (
-    <form onSubmit={handleDetailsSubmit} className="space-y-4 text-sm min-h-[440px] flex flex-col justify-between">
-      <div className="space-y-3.5">
+    <div className="space-y-3">
+      
+      {/* ========================================================= */}
+      {/* 1. HEADER ROW: "// CREATE OPERATOR ACCOUNT" & BACK BUTTON */}
+      {/* ========================================================= */}
+      <div className={`flex items-center justify-between gap-2 pb-1 border-b ${
+        isDark ? 'border-slate-800/60' : 'border-slate-200'
+      }`}>
+        <span className={`text-[9.5px] font-mono font-black uppercase tracking-wider ${
+          isDark ? 'text-cyan-400' : 'text-blue-600'
+        }`}>
+          // CREATE OPERATOR ACCOUNT
+        </span>
         
-        {/* Full Name Input */}
+        <Link
+          to="/login"
+          className={`px-2.5 py-0.5 rounded-full text-[9.5px] font-mono font-bold border transition-all flex items-center gap-1 cursor-pointer ${
+            isDark
+              ? 'bg-[#0b162f] border-slate-700 text-slate-300 hover:text-white hover:border-cyan-400'
+              : 'bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <span>←</span>
+          <span>Back to Login</span>
+        </Link>
+      </div>
+
+      {/* Title & Subtitle */}
+      <div className="space-y-0.5">
+        <h3 className={`text-lg sm:text-xl font-black tracking-tight m-0 ${
+          isDark ? 'text-white' : 'text-slate-900'
+        }`}>
+          Create Operator Account
+        </h3>
+        <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'} m-0`}>
+          Join FleetFlow and be part of a smarter logistics network.
+        </p>
+      </div>
+
+      {/* ========================================================= */}
+      {/* 2. 4 ROLE SELECTION TABS (Compact)                       */}
+      {/* ========================================================= */}
+      <div className={`grid grid-cols-4 gap-1 p-1 rounded-xl border transition-all ${
+        isDark ? 'bg-[#060c1c] border-slate-800' : 'bg-slate-100 border-slate-200 shadow-inner'
+      }`}>
+        {ROLES.map((r) => {
+          const isSelected = selectedRole === r.id
+          return (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => setSelectedRole(r.id)}
+              className={`py-1.5 px-0.5 text-center rounded-lg text-[10px] font-mono font-black transition-all cursor-pointer ${
+                isSelected
+                  ? isDark 
+                    ? 'bg-cyan-400 text-slate-950 shadow-[0_0_12px_rgba(6,182,212,0.6)] font-black'
+                    : 'bg-[#0095ff] text-white shadow-sm font-black'
+                  : isDark
+                    ? 'text-slate-400 hover:text-white bg-transparent'
+                    : 'text-slate-600 hover:text-slate-900 bg-transparent font-bold'
+              }`}
+            >
+              {r.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ========================================================= */}
+      {/* 3. COMPACT INPUT FORM FIELDS                              */}
+      {/* ========================================================= */}
+      <form onSubmit={handleDetailsSubmit} className="space-y-2.5 pt-0.5">
+        
+        {/* Full Name */}
         <div className="relative">
+          <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-sm ${
+            isDark ? 'text-cyan-400' : 'text-slate-400'
+          }`}>
+            👤
+          </div>
           <input
             name="name"
             type="text"
@@ -262,12 +339,21 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
             value={form.name}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 text-sm"
+            className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+              isDark
+                ? 'bg-[#060e22]/90 border-slate-700/80 text-white placeholder-slate-500 focus:border-cyan-400'
+                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 shadow-sm'
+            }`}
           />
         </div>
 
-        {/* Email Input */}
+        {/* Email Address */}
         <div className="relative">
+          <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-sm ${
+            isDark ? 'text-cyan-400' : 'text-slate-400'
+          }`}>
+            ✉️
+          </div>
           <input
             name="email"
             type="email"
@@ -275,24 +361,42 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
             value={form.email}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 text-sm"
+            className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+              isDark
+                ? 'bg-[#060e22]/90 border-slate-700/80 text-white placeholder-slate-500 focus:border-cyan-400'
+                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 shadow-sm'
+            }`}
           />
         </div>
 
-        {/* Mobile Number Input */}
+        {/* Mobile Number */}
         <div className="relative">
+          <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-sm ${
+            isDark ? 'text-cyan-400' : 'text-slate-400'
+          }`}>
+            📞
+          </div>
           <input
             name="phone"
             type="tel"
             placeholder="Mobile number (e.g. +91 98765 43210)"
             value={form.phone}
             onChange={handleChange}
-            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 text-sm"
+            className={`w-full pl-9 pr-3 py-2 rounded-xl text-xs outline-none border transition-all ${
+              isDark
+                ? 'bg-[#060e22]/90 border-slate-700/80 text-white placeholder-slate-500 focus:border-cyan-400'
+                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 shadow-sm'
+            }`}
           />
         </div>
 
-        {/* Password Input */}
+        {/* Password Field */}
         <div className="relative">
+          <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-sm ${
+            isDark ? 'text-cyan-400' : 'text-slate-400'
+          }`}>
+            🔒
+          </div>
           <input
             name="password"
             type={showPassword ? 'text' : 'password'}
@@ -300,28 +404,28 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
             value={form.password}
             onChange={handleChange}
             required
-            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 pr-12 text-sm"
+            className={`w-full pl-9 pr-9 py-2 rounded-xl text-xs outline-none border transition-all ${
+              isDark
+                ? 'bg-[#060e22]/90 border-slate-700/80 text-white placeholder-slate-500 focus:border-cyan-400'
+                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 shadow-sm'
+            }`}
           />
           <button
             type="button"
             onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors cursor-pointer"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer text-xs"
           >
-            {showPassword ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )}
+            {showPassword ? '🙈' : '👁️'}
           </button>
         </div>
 
-        {/* Confirm Password Input */}
+        {/* Confirm Password Field */}
         <div className="relative">
+          <div className={`absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-sm ${
+            isDark ? 'text-cyan-400' : 'text-slate-400'
+          }`}>
+            🔒
+          </div>
           <input
             name="confirmPassword"
             type={showConfirmPassword ? 'text' : 'password'}
@@ -329,92 +433,104 @@ function SignupForm({ roleName = 'DRIVER', otpSent, setOtpSent, isSubmitting, se
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
-            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-white/40 focus:outline-none focus:border-[#00f0ff] focus:ring-2 focus:ring-[#00f0ff]/20 transition-all duration-200 pr-12 text-sm"
+            className={`w-full pl-9 pr-9 py-2 rounded-xl text-xs outline-none border transition-all ${
+              isDark
+                ? 'bg-[#060e22]/90 border-slate-700/80 text-white placeholder-slate-500 focus:border-cyan-400'
+                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 focus:border-blue-500 shadow-sm'
+            }`}
           />
           <button
             type="button"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors cursor-pointer"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white cursor-pointer text-xs"
           >
-            {showConfirmPassword ? (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            )}
+            {showConfirmPassword ? '🙈' : '👁️'}
           </button>
         </div>
 
-        {/* Password Requirements Diagnostic */}
-        <div className="text-left text-white/70 text-[10px] space-y-1 bg-white/5 border border-white/10 rounded-xl p-3 select-none">
-          <div className="font-semibold text-white/80 uppercase tracking-wider text-[8px] mb-1">
-            [ Password Diagnostics ]
+        {/* ========================================================= */}
+        {/* 4. REAL-TIME PASSWORD POLICY CHECKLIST (Compact)         */}
+        {/* ========================================================= */}
+        <div className={`p-2 rounded-xl border text-[9px] font-mono select-none ${
+          isDark ? 'bg-[#060c1a]/90 border-slate-800' : 'bg-slate-50 border-slate-200'
+        }`}>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+            <div className={`flex items-center gap-1 ${checks.length ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span>{checks.length ? '🗹' : 'ⓧ'}</span>
+              <span>Minimum 8 chars</span>
+            </div>
+
+            <div className={`flex items-center gap-1 ${checks.upper ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span>{checks.upper ? '🗹' : 'ⓧ'}</span>
+              <span>Uppercase (A-Z)</span>
+            </div>
+
+            <div className={`flex items-center gap-1 ${checks.lower ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span>{checks.lower ? '🗹' : 'ⓧ'}</span>
+              <span>Lowercase (a-z)</span>
+            </div>
+
+            <div className={`flex items-center gap-1 ${checks.digit ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span>{checks.digit ? '🗹' : 'ⓧ'}</span>
+              <span>Digit (0-9)</span>
+            </div>
+
+            <div className={`flex items-center gap-1 col-span-2 ${checks.special ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <span>{checks.special ? '🗹' : 'ⓧ'}</span>
+              <span>Special character (!@#....)</span>
+            </div>
           </div>
-          <ul className="space-y-0.5 pl-0 m-0 list-none font-mono">
-            <li className={`flex items-center space-x-1.5 ${checks.length ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <span>{checks.length ? '✓' : '✗'}</span>
-              <span>Min 8 characters</span>
-            </li>
-            <li className={`flex items-center space-x-1.5 ${checks.upper ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <span>{checks.upper ? '✓' : '✗'}</span>
-              <span>One uppercase letter (A-Z)</span>
-            </li>
-            <li className={`flex items-center space-x-1.5 ${checks.lower ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <span>{checks.lower ? '✓' : '✗'}</span>
-              <span>One lowercase letter (a-z)</span>
-            </li>
-            <li className={`flex items-center space-x-1.5 ${checks.digit ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <span>{checks.digit ? '✓' : '✗'}</span>
-              <span>One digit (0-9)</span>
-            </li>
-            <li className={`flex items-center space-x-1.5 ${checks.special ? 'text-emerald-400' : 'text-rose-400'}`}>
-              <span>{checks.special ? '✓' : '✗'}</span>
-              <span>One special character (!@#...)</span>
-            </li>
-          </ul>
         </div>
 
-        {/* Compliance check */}
-        <div className="flex items-center space-x-2 text-xs text-white/50 px-1">
-          <label className="flex items-center space-x-2 cursor-pointer select-none">
+        {/* Terms Checkbox */}
+        <div>
+          <label className="flex items-center gap-2 cursor-pointer select-none text-[11px]">
             <input
               type="checkbox"
-              className="rounded border-white/15 bg-white/5 text-[#00f0ff] focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
               required
+              className={`w-3.5 h-3.5 rounded cursor-pointer ${
+                isDark ? 'accent-cyan-400' : 'accent-blue-600'
+              }`}
             />
-            <span>I agree to compliance policy regulations</span>
+            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>
+              I agree to the <span className={`${isDark ? 'text-cyan-400' : 'text-blue-600'} underline font-semibold`}>terms and compliance policy</span>
+            </span>
           </label>
         </div>
-      </div>
 
-      <div className="space-y-4">
-        {/* Action Button */}
-        <div className="pt-2">
+        {/* CTA Button */}
+        <div className="pt-0.5">
           <button
             type="submit"
-            className="w-full py-3 px-4 font-bold bg-[#00f0ff] hover:bg-[#00d2e0] text-[#06070d] rounded-xl active:scale-[0.99] transition-all duration-200 cursor-pointer text-sm shadow-[0_0_15px_rgba(0,240,255,0.35)]"
+            className={`w-full py-2.5 px-4 rounded-xl font-black text-xs tracking-wider uppercase flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.99] ${
+              isDark
+                ? 'bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-500 text-slate-950 shadow-[0_0_20px_rgba(6,182,212,0.6)] hover:brightness-110'
+                : 'bg-gradient-to-r from-[#00b4d8] to-[#0077b6] text-white shadow-blue-500/25'
+            }`}
           >
-            Create account
+            <span>Create account</span>
+            <span className="text-sm font-black">→</span>
           </button>
         </div>
 
-        {/* Navigation */}
-        <div className="text-center text-xs text-white/50">
+        {/* Sign In Link */}
+        <div className={`text-center pt-0.5 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           <span>Already have an account? </span>
-          <Link 
-            to="/login" 
-            className="font-semibold text-[#00f0ff] hover:text-[#00d2e0] hover:underline transition-all ml-1"
+          <Link
+            to="/login"
+            className={`font-bold transition-all ml-1 ${
+              isDark ? 'text-cyan-400 hover:underline hover:text-cyan-300' : 'text-blue-600 hover:underline hover:text-blue-700'
+            }`}
           >
-            Login
+            Sign in
           </Link>
         </div>
-      </div>
 
-    </form>
+      </form>
+
+    </div>
   )
 }
 

@@ -18,7 +18,7 @@ class Settings:
     )
     algorithm: str = os.getenv("ALGORITHM", "HS256")
     access_token_expire_minutes: int = int(
-        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
+        os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
     )
     cors_origins: str = os.getenv("CORS_ORIGINS", "http://localhost:5173")
     create_tables_on_startup: bool = (

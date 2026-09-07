@@ -38,6 +38,58 @@ def read_drivers(
     return [DriverOut(**_serialize_driver(d)) for d in drivers]
 
 
+@router.get("/me", response_model=DriverOut)
+def get_my_driver_profile(
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    from app.models.driver import Driver
+    driver = db.query(Driver).filter(Driver.user_id == current_user.user_id).first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver profile not found")
+    return DriverOut(**_serialize_driver(driver))
+
+
+@router.put("/me/status", response_model=DriverOut)
+def toggle_driver_status(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    import json, redis
+    from app.models.driver import Driver
+    from app.config import settings
+    
+    driver = db.query(Driver).filter(Driver.user_id == current_user.user_id).first()
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver profile not found for current user")
+
+    new_status = payload.get("status", "Available")
+    if new_status not in ["Available", "Inactive", "Assigned", "In Transit"]:
+        raise HTTPException(status_code=400, detail="Invalid driver status")
+
+    driver.status = new_status
+    db.commit()
+    db.refresh(driver)
+
+    # Publish real-time status update to WebSocket telemetry
+    try:
+        redis_url = getattr(settings, "redis_url", "redis://localhost:6379/0")
+        r_client = redis.from_url(redis_url)
+        ws_payload = {
+            "type": "DRIVER_STATUS_UPDATE",
+            "driver_id": str(driver.driver_id),
+            "user_id": str(driver.user_id),
+            "full_name": current_user.full_name,
+            "status": driver.status
+        }
+        r_client.publish("telemetry_channel", json.dumps(ws_payload))
+    except Exception as ex:
+        print(f"[Driver Status Broadcast] WebSocket pub error: {ex}")
+
+    return DriverOut(**_serialize_driver(driver))
+
+
 @router.get("/{driver_id}", response_model=DriverOut)
 def read_driver(
     driver_id: uuid.UUID,
@@ -104,10 +156,10 @@ def remove_driver(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if current_user.role.value not in ["Admin", "FleetManager"]:
+    if current_user.role.value != "Admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Admin or Fleet Manager can remove drivers."
+            detail="Only Admin can remove drivers."
         )
 
     d = get_driver(db, driver_id=driver_id)

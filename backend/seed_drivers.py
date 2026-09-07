@@ -17,6 +17,33 @@ from app.core.security import hash_password
 def seed_db():
     db = SessionLocal()
     try:
+        # 0. Seed Staff Roles (Admin, FleetManager, Dispatcher)
+        staff_data = [
+            {"full_name": "System Admin", "email": "admin@fleetflow.com", "role": RoleEnum.Admin},
+            {"full_name": "Fleet Manager User", "email": "manager@fleetflow.com", "role": RoleEnum.FleetManager},
+            {"full_name": "Dispatcher User", "email": "dispatcher@fleetflow.com", "role": RoleEnum.Dispatcher},
+        ]
+        print("Seeding administrative staff accounts...")
+        for s in staff_data:
+            existing = db.query(User).filter(User.email == s["email"]).first()
+            if not existing:
+                user = User(
+                    full_name=s["full_name"],
+                    email=s["email"],
+                    password=hash_password("SecurePassword123!"),
+                    phone="555-0000",
+                    role=s["role"]
+                )
+                db.add(user)
+                db.commit()
+                print(f"[SUCCESS] Staff account created: {s['full_name']} ({s['role'].value})")
+            else:
+                existing.role = s["role"]
+                existing.password = hash_password("SecurePassword123!")
+                db.add(existing)
+                db.commit()
+                print(f"[INFO] Staff account {s['full_name']} updated.")
+
         # 1. Seed Driver Profiles
         drivers_data = [
           {"full_name": "Sarah Jenkins", "email": "sarah.jenkins@fleetflow.com", "phone": "555-0101"},

@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models.user import User, RoleEnum
 from app.models.driver import Driver
@@ -5,12 +6,15 @@ from app.schemas.user import UserCreate
 from app.core.security import hash_password
 
 def get_user_by_email(db: Session, email: str):
-    return db.query(User).filter(User.email == email).first()
+    if not email:
+        return None
+    return db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
 
 def create_user(db: Session, user: UserCreate):
+    clean_email = user.email.strip().lower() if user.email else user.email
     db_user = User(
         full_name=user.full_name,
-        email=user.email,
+        email=clean_email,
         password=hash_password(user.password),
         phone=user.phone,
         role=user.role,

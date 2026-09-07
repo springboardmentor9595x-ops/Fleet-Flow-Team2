@@ -42,12 +42,14 @@ def add_maintenance(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if current_user.role.value.upper() == "DRIVER":
+    role_val = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    if role_val not in ["FleetManager", "Admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Drivers cannot create maintenance records."
+            detail="Only Fleet Managers and Admins can schedule maintenance records."
         )
-    return create_maintenance_record(db=db, record=record)
+    created_rec = create_maintenance_record(db=db, record=record)
+    return created_rec
 
 
 @router.put("/{maintenance_id}", response_model=MaintenanceOut)
@@ -57,10 +59,11 @@ def edit_maintenance(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if current_user.role.value.upper() == "DRIVER":
+    role_val = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    if role_val not in ["FleetManager", "Admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Drivers cannot update maintenance records."
+            detail="Only Fleet Managers and Admins can update maintenance records."
         )
     db_record = get_maintenance_record(db, maintenance_id=maintenance_id)
     if not db_record:
@@ -74,10 +77,11 @@ def remove_maintenance(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    if current_user.role.value.upper() == "DRIVER":
+    role_val = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+    if role_val not in ["FleetManager", "Admin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Drivers cannot delete maintenance records."
+            detail="Only Fleet Managers and Admins can delete maintenance records."
         )
     db_record = get_maintenance_record(db, maintenance_id=maintenance_id)
     if not db_record:

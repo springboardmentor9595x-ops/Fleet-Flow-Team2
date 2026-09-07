@@ -4,7 +4,7 @@ from app.models.trip import Trip
 from app.schemas.trip import TripCreate
 
 def get_trips(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(Trip).order_by(Trip.trip_id.desc()).offset(skip).limit(limit).all()
+    return db.query(Trip).order_by(Trip.created_at.desc()).offset(skip).limit(limit).all()
 
 def get_trip(db: Session, trip_id: uuid.UUID):
     return db.query(Trip).filter(Trip.trip_id == trip_id).first()

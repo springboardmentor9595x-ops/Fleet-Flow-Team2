@@ -10,6 +10,11 @@ class UserCreate(BaseModel):
     phone: str | None = None
     role: RoleEnum = RoleEnum.Driver
 
+class UserUpdate(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
+    role: RoleEnum | None = None
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
@@ -18,7 +23,7 @@ class UserOut(BaseModel):
     user_id: uuid.UUID
     full_name: str
     email: EmailStr
-    phone: str | None
+    phone: str | None = None
     role: RoleEnum
     created_at: datetime
 
@@ -36,18 +41,6 @@ class TokenRefreshRequest(BaseModel):
 class OTPSendRequest(BaseModel):
     email: EmailStr
     otp: str
-
-class ResetPasswordRequest(BaseModel):
-    email: EmailStr
-    password: str
-
-class OTPSendRequest(BaseModel):
-    email: EmailStr
-    otp: str
-
-class ResetPasswordRequest(BaseModel):
-    email: EmailStr
-    password: str
 
 class ResetPasswordRequest(BaseModel):
     email: EmailStr

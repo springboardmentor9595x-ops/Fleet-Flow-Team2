@@ -13,7 +13,7 @@ class DriverCreate(BaseModel):
     license_number: Optional[str] = None
     experience_years: Optional[int] = 0
     address: Optional[str] = None
-    status: str = "Active"
+    status: str = "Available"
 
 
 class DriverUpdate(BaseModel):
