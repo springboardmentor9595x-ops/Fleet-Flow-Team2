@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import ForgotPassword from './pages/ForgotPassword'
 import Dashboard from './pages/Dashboard'
+import LandingPage from './pages/LandingPage'
 import PublicRoute from './routes/PublicRoute'
 import ProtectedRoute from './routes/ProtectedRoute'
 import './App.css'
@@ -19,6 +20,9 @@ function App() {
           <NotificationProvider>
             <BrowserRouter>
               <Routes>
+                {/* Landing Presentation Page (Accessible by all users) */}
+                <Route path="/" element={<LandingPage />} />
+
                 {/* Public Auth Routes (Guest Only - Redirect to /dashboard if already logged in) */}
                 <Route element={<PublicRoute />}>
                   <Route path="/login" element={<Login />} />
@@ -32,8 +36,7 @@ function App() {
                 </Route>
 
                 {/* Fallback Redirection */}
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="*" element={<Navigate to="/login" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </BrowserRouter>
           </NotificationProvider>

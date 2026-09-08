@@ -6,13 +6,22 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-@dataclass(frozen=True)
-class Settings:
-    app_name: str = "Fleet Flow API"
-    database_url: str = os.getenv(
+def _get_database_url() -> str:
+    url = os.getenv(
         "DATABASE_URL",
         "postgresql://postgres:postgres@localhost:5432/fleetflow",
     )
+    # Render and other cloud providers might provide 'postgres://' which SQLAlchemy 1.4+ rejects
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    return url
+
+
+@dataclass(frozen=True)
+class Settings:
+    app_name: str = "Fleet Flow API"
+    database_url: str = _get_database_url()
+    redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     secret_key: str = os.getenv(
         "SECRET_KEY", "b3b7a5a8f5e08b1a37c3a07788fa2989"
     )
@@ -31,3 +40,4 @@ class Settings:
 
 
 settings = Settings()
+

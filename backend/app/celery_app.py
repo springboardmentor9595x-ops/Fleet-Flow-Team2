@@ -1,11 +1,8 @@
 from celery import Celery
 from celery.schedules import crontab
-import os
-from dotenv import load_dotenv
+from app.config import settings
 
-load_dotenv()
-
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+REDIS_URL = settings.redis_url
 
 celery_app = Celery(
     "fleetflow",

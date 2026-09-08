@@ -66,7 +66,7 @@ def create_and_broadcast_notification(
         try:
             import redis
             from app.config import settings
-            r = redis.from_url(getattr(settings, "redis_url", "redis://localhost:6379/0"))
+            r = redis.from_url(settings.redis_url)
             payload = {
                 "type": "NOTIFICATION_EVENT",
                 "notification_id": str(notif.notification_id),

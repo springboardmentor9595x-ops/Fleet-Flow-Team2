@@ -83,9 +83,22 @@ export function NotificationProvider({ children }) {
     let reconnectTimeout;
     
     const connect = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.hostname === 'localhost' ? '127.0.0.1:8000' : window.location.host
-      const wsUrl = `${protocol}//${host}/ws/telemetry`
+      let wsUrl
+      const apiUrl = import.meta.env.VITE_API_URL
+      if (apiUrl) {
+        try {
+          const parsed = new URL(apiUrl, window.location.href)
+          const wsProtocol = parsed.protocol === 'https:' ? 'wss:' : 'ws:'
+          wsUrl = `${wsProtocol}//${parsed.host}/ws/telemetry`
+        } catch (e) {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+          wsUrl = `${protocol}//${window.location.host}/ws/telemetry`
+        }
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+        const host = window.location.hostname === 'localhost' ? '127.0.0.1:8000' : window.location.host
+        wsUrl = `${protocol}//${host}/ws/telemetry`
+      }
 
       try {
         ws = new WebSocket(wsUrl)

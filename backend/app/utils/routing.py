@@ -21,16 +21,18 @@ DEPOTS = {
 
 AVG_SPEED_MPH = 60.0
 
+from app.config import settings
+
 # Try connecting to Redis for Caching
 try:
-    r_client = redis.Redis(host='127.0.0.1', port=6379, db=0, socket_connect_timeout=1)
+    r_client = redis.from_url(settings.redis_url, socket_connect_timeout=2)
     r_client.ping()
     redis_available = True
     print("[Routing Engine] Redis cache backend: ACTIVE")
-except Exception:
+except Exception as re:
     r_client = None
     redis_available = False
-    print("[Routing Engine] Redis cache backend: OFFLINE (falling back to memory cache)")
+    print(f"[Routing Engine] Redis cache backend: OFFLINE (falling back to memory cache) - {re}")
 
 # In-memory backup cache
 MEMORY_CACHE = {}

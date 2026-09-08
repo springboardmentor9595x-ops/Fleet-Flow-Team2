@@ -74,8 +74,7 @@ def toggle_driver_status(
 
     # Publish real-time status update to WebSocket telemetry
     try:
-        redis_url = getattr(settings, "redis_url", "redis://localhost:6379/0")
-        r_client = redis.from_url(redis_url)
+        r_client = redis.from_url(settings.redis_url)
         ws_payload = {
             "type": "DRIVER_STATUS_UPDATE",
             "driver_id": str(driver.driver_id),

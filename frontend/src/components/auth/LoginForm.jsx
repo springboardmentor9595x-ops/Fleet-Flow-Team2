@@ -241,37 +241,6 @@ function LoginForm() {
 
       </form>
 
-      {/* ========================================================= */}
-      {/* 3. CARD BOTTOM AESTHETIC BANNER ACCENT                   */}
-      {/* ========================================================= */}
-      <div className="pt-2">
-        {isDark ? (
-          /* Dark Mode Wave Accent & "KEEP MOVING FORWARD" */
-          <div className="rounded-2xl bg-[#071026]/90 border border-slate-800/80 p-3 flex items-center justify-between relative overflow-hidden">
-            <div className="absolute right-0 bottom-0 top-0 w-1/2 bg-[radial-gradient(ellipse_at_bottom_right,rgba(6,182,212,0.15),transparent_70%)] pointer-events-none"></div>
-            <div className="text-[9px] font-mono font-black tracking-widest uppercase text-slate-400 leading-tight">
-              KEEP<br />
-              <span className="text-cyan-400">MOVING</span><br />
-              FORWARD
-            </div>
-            <div className="text-2xl opacity-80 animate-pulse">
-              🚛
-            </div>
-          </div>
-        ) : (
-          /* Light Mode Scenic Mountain Quote Banner */
-          <div className="rounded-2xl bg-gradient-to-r from-blue-50 via-sky-50 to-slate-50 border border-blue-100 p-3 flex items-center gap-3">
-            <span className="text-2xl">🚛</span>
-            <div className="min-w-0">
-              <span className="text-xs font-serif italic font-bold text-slate-700 block truncate">
-                "Moving today for a better tomorrow"
-              </span>
-              <div className="w-10 h-0.5 bg-blue-500 rounded-full mt-0.5"></div>
-            </div>
-          </div>
-        )}
-      </div>
-
     </div>
   )
 }

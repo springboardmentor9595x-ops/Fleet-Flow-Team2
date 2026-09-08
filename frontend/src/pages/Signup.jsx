@@ -16,90 +16,89 @@ function Signup() {
       {/* ========================================================= */}
       {/* 1. CINEMATIC PHOTOREALISTIC BACKGROUND                    */}
       {/* ========================================================= */}
-      <AuthHeroBackground isDark={isDark} showRoute={false} isSignup={true} />
+      <AuthHeroBackground isDark={isDark} />
 
       {/* ========================================================= */}
-      {/* 2. TOP HEADER NAVIGATION (Identical to Login)             */}
+      {/* 2. TOP HEADER NAVIGATION                                  */}
       {/* ========================================================= */}
       <header className="auth-header relative z-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-5 sm:pt-6 flex items-center justify-between gap-4 bg-transparent border-none">
         
         {/* Left: Brand Logo & Tagline */}
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-400 to-blue-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] shrink-0">
-              F
-            </div>
-            <div>
+        <Link to="/" className="flex items-center gap-3 text-decoration-none group">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-400 to-blue-500 flex items-center justify-center text-slate-950 font-black text-xl shadow-[0_0_20px_rgba(6,182,212,0.6)] shrink-0 group-hover:scale-105 transition-transform">
+            F
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
               <h1 className={`text-xl sm:text-2xl font-black tracking-wider m-0 leading-none ${
                 isDark ? 'text-white' : 'text-slate-900'
               }`}>
                 FLEET<span className={isDark ? 'text-cyan-400' : 'text-blue-600'}>FLOW</span>
               </h1>
-              <p className={`text-[8.5px] sm:text-[9.5px] tracking-widest uppercase m-0 mt-0.5 font-mono font-bold ${
-                isDark ? 'text-cyan-400/90' : 'text-slate-600'
+              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                isDark ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-blue-50 border-blue-200 text-blue-700'
               }`}>
-                ENTERPRISE LOGISTICS TELEMETRICS
-              </p>
+                REGISTER
+              </span>
             </div>
+            <p className={`text-[8.5px] sm:text-[9.5px] tracking-widest uppercase m-0 mt-0.5 font-mono font-bold ${
+              isDark ? 'text-cyan-400/90' : 'text-slate-600'
+            }`}>
+              ENTERPRISE LOGISTICS OS
+            </p>
           </div>
-          
-          <div className={`text-[10px] font-mono font-bold tracking-[0.25em] uppercase pl-1 pt-1 ${
-            isDark ? 'text-slate-400' : 'text-slate-600'
-          }`}>
-            DRIVE &nbsp;•&nbsp; CONNECT &nbsp;•&nbsp; DELIVER
-          </div>
-        </div>
+        </Link>
 
-        {/* Right: Theme Toggle & Slogan Accent */}
-        <div className="flex items-center gap-4">
-          <DayNightToggle />
-
-          <div className="hidden md:block text-right transform rotate-[-4deg]">
-            <span className={`text-lg sm:text-xl font-black italic block leading-tight tracking-tight ${
+        {/* Right: Theme Toggle & Clean Home Link (No Arrow) */}
+        <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            className={`hidden sm:flex items-center px-3.5 py-1.5 rounded-xl font-mono text-xs font-bold transition-all border ${
               isDark 
-                ? 'text-cyan-300 drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]' 
-                : 'text-blue-600 drop-shadow-sm'
-            }`} style={{ fontFamily: 'cursive, "Brush Script MT", sans-serif' }}>
-              Smarter Fleets<br />
-              <span className={isDark ? 'text-white' : 'text-slate-900'}>Brighter Tomorrow</span>
-            </span>
-            <div className={`w-14 h-0.5 rounded-full ml-auto mt-0.5 ${
-              isDark ? 'bg-cyan-400 shadow-[0_0_8px_#00f0ff]' : 'bg-blue-600'
-            }`}></div>
-          </div>
+                ? 'bg-slate-900/70 border-slate-800 text-slate-300 hover:text-white hover:border-cyan-500/50 backdrop-blur-md' 
+                : 'bg-white/85 border-slate-200 text-slate-700 hover:text-slate-950 shadow-xs backdrop-blur-md'
+            }`}
+          >
+            Home
+          </Link>
+          <DayNightToggle />
         </div>
 
       </header>
 
       {/* ========================================================= */}
-      {/* 3. MAIN HERO GRID: LEFT OVERVIEW & RIGHT COMPACT CARD     */}
+      {/* 3. MAIN HERO GRID: LEFT OVERVIEW & RIGHT SIGNUP CARD      */}
       {/* ========================================================= */}
       <main className="relative z-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 my-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
         
         {/* --------------------------------------------------------- */}
-        {/* LEFT COLUMN: ENTERPRISE OVERVIEW & 3 KPI CARDS            */}
+        {/* LEFT COLUMN: ENTERPRISE OVERVIEW (Transparent Background) */}
         {/* --------------------------------------------------------- */}
         <div className="lg:col-span-6 xl:col-span-7 space-y-5 text-left">
           
           {/* Pill Badge */}
-          <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-mono font-black shadow-sm ${
+          <div className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-mono font-bold shadow-xs backdrop-blur-md ${
             isDark 
-              ? 'bg-[#08142a]/90 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(6,182,212,0.25)]' 
-              : 'bg-blue-50 border-blue-200 text-blue-700'
+              ? 'bg-[#08142a]/90 border-cyan-500/40 text-cyan-300' 
+              : 'bg-white/90 border-blue-200 text-blue-800 shadow-xs'
           }`}>
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span>NEXT-GEN AUTONOMOUS FLEET OS</span>
+            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
+            <span>ENTERPRISE FLEET NETWORK</span>
           </div>
 
-          {/* Headline */}
+          {/* Headline directly over transparent background */}
           <h2 className="text-3xl sm:text-4xl xl:text-5xl font-black tracking-tight leading-[1.12] m-0">
-            <span className={isDark ? 'text-white' : 'text-slate-900'}>
+            <span className={`drop-shadow-xs ${isDark ? 'text-white' : 'text-slate-950'}`}>
               The comprehensive{' '}
             </span>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-400 font-black">
+            <span className={
+              isDark
+                ? 'text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-400 font-black drop-shadow-[0_0_20px_rgba(6,182,212,0.6)]'
+                : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-700 font-black drop-shadow-sm'
+            }>
               fleet management
             </span>{' '}
-            <span className={isDark ? 'text-white' : 'text-slate-900'}>
+            <span className={`drop-shadow-xs ${isDark ? 'text-white' : 'text-slate-950'}`}>
               solution.
             </span>
           </h2>
@@ -109,31 +108,37 @@ function Signup() {
             
             {/* 1. Real-time tracking */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-400/40 text-cyan-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(6,182,212,0.3)] shrink-0">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-xs shrink-0 ${
+                isDark ? 'bg-cyan-500/15 border border-cyan-400/40 text-cyan-400' : 'bg-white/90 border border-blue-200 text-blue-700 shadow-xs'
+              }`}>
                 ⚡
               </div>
-              <span className={`text-sm sm:text-base font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                Real-time tracking
+              <span className={`text-sm sm:text-base font-bold drop-shadow-xs ${isDark ? 'text-slate-200' : 'text-slate-950 font-black'}`}>
+                Real-time GPS map tracking & shortest routes
               </span>
             </div>
 
             {/* 2. Smarter operations */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/15 border border-blue-400/40 text-blue-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(59,130,246,0.3)] shrink-0">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-xs shrink-0 ${
+                isDark ? 'bg-blue-500/15 border border-blue-400/40 text-blue-400' : 'bg-white/90 border border-blue-200 text-blue-700 shadow-xs'
+              }`}>
                 📊
               </div>
-              <span className={`text-sm sm:text-base font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                Smarter operations
+              <span className={`text-sm sm:text-base font-bold drop-shadow-xs ${isDark ? 'text-slate-200' : 'text-slate-950 font-black'}`}>
+                Automated fuel logging & maintenance alerts
               </span>
             </div>
 
             {/* 3. Safer & efficient fleets */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-400/40 text-purple-400 flex items-center justify-center text-sm shadow-[0_0_10px_rgba(168,85,247,0.3)] shrink-0">
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm shadow-xs shrink-0 ${
+                isDark ? 'bg-purple-500/15 border border-purple-400/40 text-purple-400' : 'bg-white/90 border border-blue-200 text-blue-700 shadow-xs'
+              }`}>
                 🛡️
               </div>
-              <span className={`text-sm sm:text-base font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
-                Safer & efficient fleets
+              <span className={`text-sm sm:text-base font-bold drop-shadow-xs ${isDark ? 'text-slate-200' : 'text-slate-950 font-black'}`}>
+                Role-based dashboards & driver recognition
               </span>
             </div>
 
@@ -143,43 +148,43 @@ function Signup() {
           <div className="grid grid-cols-3 gap-3 pt-2 max-w-md">
             
             {/* KPI 1: 99.8% Uptime */}
-            <div className={`p-3 rounded-2xl border text-center transition-all ${
+            <div className={`p-3 rounded-2xl border text-center transition-all backdrop-blur-md ${
               isDark 
-                ? 'bg-[#081228]/85 border-cyan-500/30 text-white shadow-[0_0_15px_rgba(6,182,212,0.12)]' 
-                : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                ? 'bg-[#081228]/85 border-cyan-500/30 text-white' 
+                : 'bg-white/90 border-slate-200/90 text-slate-900 shadow-md'
             }`}>
-              <div className="text-lg sm:text-xl font-black font-mono text-cyan-400">
+              <div className="text-lg sm:text-xl font-black font-mono text-cyan-500">
                 99.8%
               </div>
-              <div className={`text-[8.5px] font-mono font-black uppercase mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className={`text-[8.5px] font-mono font-bold uppercase mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 UPTIME
               </div>
             </div>
 
             {/* KPI 2: 100+ Live Hubs */}
-            <div className={`p-3 rounded-2xl border text-center transition-all ${
+            <div className={`p-3 rounded-2xl border text-center transition-all backdrop-blur-md ${
               isDark 
-                ? 'bg-[#081228]/85 border-cyan-500/30 text-white shadow-[0_0_15px_rgba(6,182,212,0.12)]' 
-                : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                ? 'bg-[#081228]/85 border-cyan-500/30 text-white' 
+                : 'bg-white/90 border-slate-200/90 text-slate-900 shadow-md'
             }`}>
-              <div className="text-lg sm:text-xl font-black font-mono text-cyan-400">
+              <div className="text-lg sm:text-xl font-black font-mono text-blue-600">
                 100+
               </div>
-              <div className={`text-[8.5px] font-mono font-black uppercase mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className={`text-[8.5px] font-mono font-bold uppercase mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 LIVE HUBS
               </div>
             </div>
 
             {/* KPI 3: 24/7 Monitoring */}
-            <div className={`p-3 rounded-2xl border text-center transition-all ${
+            <div className={`p-3 rounded-2xl border text-center transition-all backdrop-blur-md ${
               isDark 
-                ? 'bg-[#081228]/85 border-cyan-500/30 text-white shadow-[0_0_15px_rgba(6,182,212,0.12)]' 
-                : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+                ? 'bg-[#081228]/85 border-cyan-500/30 text-white' 
+                : 'bg-white/90 border-slate-200/90 text-slate-900 shadow-md'
             }`}>
-              <div className="text-lg sm:text-xl font-black font-mono text-cyan-400">
+              <div className="text-lg sm:text-xl font-black font-mono text-emerald-500">
                 24/7
               </div>
-              <div className={`text-[8.5px] font-mono font-black uppercase mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <div className={`text-[8.5px] font-mono font-bold uppercase mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 MONITORING
               </div>
             </div>
@@ -187,8 +192,8 @@ function Signup() {
           </div>
 
           {/* Subtitle Slogan */}
-          <div className={`text-xs font-mono font-bold tracking-[0.25em] uppercase pt-1 ${
-            isDark ? 'text-slate-400' : 'text-slate-600'
+          <div className={`text-xs font-mono font-black tracking-[0.25em] uppercase pt-1 ${
+            isDark ? 'text-slate-300 drop-shadow-sm' : 'text-slate-900 drop-shadow-xs'
           }`}>
             DRIVE &nbsp;•&nbsp; CONNECT &nbsp;•&nbsp; DELIVER
           </div>
@@ -200,10 +205,10 @@ function Signup() {
         {/* --------------------------------------------------------- */}
         <div className="lg:col-span-6 xl:col-span-5 w-full max-w-md mx-auto">
           
-          <div className={`p-5 sm:p-6 rounded-[26px] border transition-all duration-300 backdrop-blur-2xl relative ${
+          <div className={`p-6 sm:p-7 rounded-[32px] border transition-all duration-300 backdrop-blur-2xl relative ${
             isDark
-              ? 'bg-[#081228]/95 border-cyan-500/40 shadow-[0_0_40px_rgba(6,182,212,0.22)]'
-              : 'bg-white/95 border-slate-200/90 shadow-xl'
+              ? 'bg-[#081228]/95 border-cyan-500/40 shadow-[0_0_50px_rgba(6,182,212,0.25)]'
+              : 'bg-white/90 border-white/90 shadow-2xl backdrop-blur-xl'
           }`}>
             <SignupForm />
           </div>
@@ -211,31 +216,6 @@ function Signup() {
         </div>
 
       </main>
-
-      {/* ========================================================= */}
-      {/* 4. FOOTER TELEMETRY BAR                                   */}
-      {/* ========================================================= */}
-      <footer className={`relative z-20 w-full border-t py-3 px-4 sm:px-8 text-[10px] sm:text-[11px] font-mono transition-colors ${
-        isDark 
-          ? 'border-slate-800/80 bg-[#020510]/80 text-slate-400' 
-          : 'border-slate-200 bg-white/80 text-slate-600'
-      }`}>
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-cyan-500">FLEETFLOW</span>
-            <span>|</span>
-            <span>ENTERPRISE LOGISTICS TELEMETRICS</span>
-          </div>
-
-          <div className="flex items-center gap-2 tracking-wider">
-            <span>PEOPLE</span>
-            <span>|</span>
-            <span>TECHNOLOGY</span>
-            <span>|</span>
-            <span>SAFER ROADS</span>
-          </div>
-        </div>
-      </footer>
 
     </div>
   )

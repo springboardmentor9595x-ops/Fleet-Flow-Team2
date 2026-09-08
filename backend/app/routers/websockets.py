@@ -13,19 +13,20 @@ from app.models.shipment import Shipment
 from app.models.gps_tracking import GPSTracking
 from app.utils.routing import solve_dijkstra_route, DEPOTS
 from app.routers.trips import notify_shipment_status_change, notify_trip_cargo_status_change
+from app.config import settings
 
 router = APIRouter()
 
 # Try connecting to Redis for Pub/Sub
 try:
-    r_pubsub = redis.Redis(host='127.0.0.1', port=6379, db=0, socket_connect_timeout=1)
+    r_pubsub = redis.from_url(settings.redis_url, socket_connect_timeout=2)
     r_pubsub.ping()
     redis_pubsub_available = True
     print("[WebSocket Engine] Redis Pub/Sub: ACTIVE")
-except Exception:
+except Exception as re:
     r_pubsub = None
     redis_pubsub_available = False
-    print("[WebSocket Engine] Redis Pub/Sub: OFFLINE (falling back to memory broadcasting)")
+    print(f"[WebSocket Engine] Redis Pub/Sub: OFFLINE (falling back to memory broadcasting) - {re}")
 
 class ConnectionManager:
     def __init__(self):
